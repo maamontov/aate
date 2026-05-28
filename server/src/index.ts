@@ -294,28 +294,43 @@ io.on("connection", (socket: Socket) => {
       const isA = room.playerA?.socketId === socket.id;
       const isB = room.playerB?.socketId === socket.id;
       if (!isHost && !isA && !isB) continue;
-      let disconnectedSet = disconnectedSockets.get(roomCode);
-      if (!disconnectedSet) {
-        disconnectedSet = new Set<string>();
-        disconnectedSockets.set(roomCode, disconnectedSet);
+
+      const isActive = room.phase !== "lobby" && room.phase !== "finished";
+
+      if ((isA || isB) && isActive) {
+        // Игрок отключился во время игры — сразу завершаем
+        clearRoomTimer(roomCode);
+        clearPauseTimer(roomCode);
+        room.phase = "finished";
+        room.phaseDeadlineTs = null;
+        scoreWinner(room);
+        io.to(roomCode).emit(SERVER_TO_CLIENT.matchFinished, { winner: room.winner, reason: "player_disconnect" });
+        emitRoom(roomCode);
+      } else if (isHost) {
+        // Host отключился — пауза 30с
+        let disconnectedSet = disconnectedSockets.get(roomCode);
+        if (!disconnectedSet) {
+          disconnectedSet = new Set<string>();
+          disconnectedSockets.set(roomCode, disconnectedSet);
+        }
+        disconnectedSet.add(socket.id);
+        clearRoomTimer(roomCode);
+        clearPauseTimer(roomCode);
+        setPaused(roomCode, true);
+        io.to(roomCode).emit(SERVER_TO_CLIENT.roomPeerDisconnected, { roomCode });
+        pauseTimers.set(
+          roomCode,
+          setTimeout(() => {
+            const r = rooms.get(roomCode);
+            if (!r) return;
+            r.phase = "finished";
+            r.phaseDeadlineTs = null;
+            scoreWinner(r);
+            io.to(roomCode).emit(SERVER_TO_CLIENT.matchFinished, { winner: r.winner, reason: "disconnect_timeout" });
+            emitRoom(roomCode);
+          }, PAUSE_ON_DISCONNECT_MS)
+        );
       }
-      disconnectedSet.add(socket.id);
-      clearRoomTimer(roomCode);
-      clearPauseTimer(roomCode);
-      setPaused(roomCode, true);
-      io.to(roomCode).emit(SERVER_TO_CLIENT.roomPeerDisconnected, { roomCode });
-      pauseTimers.set(
-        roomCode,
-        setTimeout(() => {
-          const r = rooms.get(roomCode);
-          if (!r) return;
-          r.phase = "finished";
-          r.phaseDeadlineTs = null;
-          scoreWinner(r);
-          io.to(roomCode).emit(SERVER_TO_CLIENT.matchFinished, { winner: r.winner, reason: "disconnect_timeout" });
-          emitRoom(roomCode);
-        }, PAUSE_ON_DISCONNECT_MS)
-      );
       break;
     }
   });

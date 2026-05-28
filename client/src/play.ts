@@ -1,7 +1,7 @@
 import { setupBaseEvents } from "./baseEvents";
 import { CLIENT_TO_SERVER, SERVER_TO_CLIENT } from "./events";
 import { socket } from "./socket";
-import { myRole, resetState, roomCode, setMyRole, setRoomCode } from "./state";
+import { myRole, roomCode, setMyRole, setRoomCode } from "./state";
 import { formatSecondsLeft, phaseColor, progressPercent } from "./timer";
 import type { Phase, RoomState } from "./types";
 
@@ -26,12 +26,11 @@ export function renderMobile(appEl: HTMLDivElement, reconnect: boolean): void {
       </div>
 
       <div id="section-game" style="display:none">
-        <p id="room-info" class="muted"></p>
         <p id="status-game" class="muted"></p>
+        <p id="finish-status" class="finish-status" style="display:none"></p>
         <p id="phase-timer" class="phase-timer"></p>
         <div class="timer-track"><div id="timer-bar" class="timer-bar"></div></div>
-        <div id="choices" class="row"></div>
-        <button id="disconnect" class="secondary">Отключиться</button>
+        <div id="choices" class="choices-vertical"></div>
       </div>
     </div>
   `;
@@ -67,10 +66,6 @@ export function renderMobile(appEl: HTMLDivElement, reconnect: boolean): void {
     bar.style.width = `${percent}%`;
     bar.style.background = color;
   };
-  const setRoomInfo = (code: string) => {
-    const el = document.querySelector<HTMLParagraphElement>("#room-info");
-    if (el) el.textContent = `Код комнаты: ${code}`;
-  };
   const setPhaseVisual = (phase: RoomState["phase"]) => {
     const panel = document.querySelector<HTMLDivElement>("#mobile-panel");
     if (!panel) return;
@@ -89,6 +84,8 @@ export function renderMobile(appEl: HTMLDivElement, reconnect: boolean): void {
   let lastDeadline: number | null = null;
   let currentPhase: RoomState["phase"] = "lobby";
   let timerId: number | null = null;
+  let finishReason: string | undefined;
+
   const restartTimer = (deadlineTs: number | null, phase: RoomState["phase"]) => {
     lastDeadline = deadlineTs;
     currentPhase = phase;
@@ -109,15 +106,43 @@ export function renderMobile(appEl: HTMLDivElement, reconnect: boolean): void {
     c.innerHTML = "";
     const iAmActive = myRole === activePlayer;
     const canAnswer = phase === "answering" && iAmActive;
-    const canGuess = phase === "guessing" && !iAmActive && myRole !== "host";
+    const canGuess = phase === "guessing" && !iAmActive;
     if (!canAnswer && !canGuess) return;
-    c.innerHTML = `<button id="a1">1</button><button id="a2">2</button><button id="a3">3</button>`;
-    (document.querySelector("#a1") as HTMLButtonElement).onclick = () =>
-      socket.emit(canAnswer ? CLIENT_TO_SERVER.playerSubmitActiveAnswer : CLIENT_TO_SERVER.playerSubmitGuessAnswer, { roomCode, value: 1 });
-    (document.querySelector("#a2") as HTMLButtonElement).onclick = () =>
-      socket.emit(canAnswer ? CLIENT_TO_SERVER.playerSubmitActiveAnswer : CLIENT_TO_SERVER.playerSubmitGuessAnswer, { roomCode, value: 2 });
-    (document.querySelector("#a3") as HTMLButtonElement).onclick = () =>
-      socket.emit(canAnswer ? CLIENT_TO_SERVER.playerSubmitActiveAnswer : CLIENT_TO_SERVER.playerSubmitGuessAnswer, { roomCode, value: 3 });
+
+    const options = ["1", "2", "3"];
+    for (let i = 0; i < 3; i++) {
+      const btn = document.createElement("button");
+      btn.textContent = options[i];
+      btn.onclick = () =>
+        socket.emit(
+          canAnswer ? CLIENT_TO_SERVER.playerSubmitActiveAnswer : CLIENT_TO_SERVER.playerSubmitGuessAnswer,
+          { roomCode, value: i + 1 }
+        );
+      c.appendChild(btn);
+    }
+  };
+
+  const renderFinish = (room: RoomState, reason?: string) => {
+    const el = document.querySelector<HTMLParagraphElement>("#finish-status");
+    if (!el) return;
+    if (room.phase !== "finished") {
+      el.style.display = "none";
+      return;
+    }
+    el.style.display = "";
+    if (reason === "player_disconnect") {
+      const a = room.playerA;
+      const b = room.playerB;
+      let leader = "Ничья";
+      if (a && b && a.score > b.score) leader = `Ведёт ${a.nickname}`;
+      else if (a && b && b.score > a.score) leader = `Ведёт ${b.nickname}`;
+      el.textContent = `Матч завершён — технические проблемы. ${leader}`;
+    } else {
+      if (room.winner === "draw") el.textContent = "Ничья!";
+      else if (room.winner === "playerA") el.textContent = `Победитель: ${room.playerA?.nickname ?? "A"}`;
+      else if (room.winner === "playerB") el.textContent = `Победитель: ${room.playerB?.nickname ?? "B"}`;
+      else el.textContent = "Матч завершён";
+    }
   };
 
   // Ошибки показываем на текущем активном экране
@@ -144,37 +169,29 @@ export function renderMobile(appEl: HTMLDivElement, reconnect: boolean): void {
     socket.emit(CLIENT_TO_SERVER.playerJoinRoom, { roomCode: code, nickname });
   };
 
-  // --- Отключение ---
-  (document.querySelector("#disconnect") as HTMLButtonElement).onclick = () => {
-    socket.disconnect();
-    resetState();
-    if (timerId) window.clearInterval(timerId);
-    timerId = null;
-    showSection("connect");
-    setStatusConnect("Отключено.");
-    socket.connect();
-  };
-
   // --- События ---
   socket.off(SERVER_TO_CLIENT.playerJoined);
   socket.on(SERVER_TO_CLIENT.playerJoined, (payload: { role: "playerA" | "playerB"; roomCode: string }) => {
     setMyRole(payload.role);
     setRoomCode(payload.roomCode);
-    setRoomInfo(payload.roomCode);
     setStatusGame(`Подключен как ${payload.role}`);
     showSection("game");
+  });
+
+  socket.off(SERVER_TO_CLIENT.matchFinished);
+  socket.on(SERVER_TO_CLIENT.matchFinished, (payload: { winner: string | null; reason?: string }) => {
+    finishReason = payload.reason;
   });
 
   socket.off(SERVER_TO_CLIENT.roomUpdated);
   socket.on(SERVER_TO_CLIENT.roomUpdated, (room: RoomState) => {
     if (roomCode && room.roomCode !== roomCode) return;
-    setRoomInfo(room.roomCode);
     const activeNick = room.activePlayer === "playerA" ? room.playerA?.nickname : room.playerB?.nickname;
     setStatusGame(`Ход: ${activeNick ?? room.activePlayer}`);
-    if (room.phase === "finished") setStatusGame(`Матч завершен. Победитель: ${room.winner ?? "не определен"}`);
     setPhaseVisual(room.phase);
     restartTimer(room.phaseDeadlineTs, room.phase);
     renderChoices(room.phase, room.activePlayer);
+    renderFinish(room, finishReason);
   });
 
   // --- Начальное состояние ---
@@ -183,6 +200,5 @@ export function renderMobile(appEl: HTMLDivElement, reconnect: boolean): void {
 
   if (reconnect) {
     showSection("game");
-    setRoomInfo(roomCode);
   }
 }

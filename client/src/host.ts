@@ -16,7 +16,7 @@ const PHASE_LABELS: Record<Phase, string> = {
 
 export function renderHost(appEl: HTMLDivElement): void {
   appEl.innerHTML = `
-    <div id="host-panel" class="panel">
+    <div id="host-panel" class="panel host-panel">
       <div id="section-lobby">
         <select id="deck-size">
           <option value="" disabled selected>Выберите режим игры</option>
@@ -27,11 +27,8 @@ export function renderHost(appEl: HTMLDivElement): void {
         <button id="create">Создать комнату</button>
         <button id="start">Старт матча</button>
         <p id="room-code" class="room-code" style="display:none"></p>
-        <hr />
-        <p id="status-lobby" class="muted"></p>
       </div>
       <div id="section-game" style="display:none">
-        <p id="status-game" class="muted"></p>
         <div id="question-area" style="display:none">
           <p id="question-text" class="question-text"></p>
           <div id="options-row" class="options-row">
@@ -40,8 +37,19 @@ export function renderHost(appEl: HTMLDivElement): void {
             <div id="opt-3" class="option-card"></div>
           </div>
         </div>
+        <p id="finish-status" class="finish-status" style="display:none"></p>
         <p id="phase-timer" class="phase-timer"></p>
         <div class="timer-track"><div id="timer-bar" class="timer-bar"></div></div>
+      </div>
+      <div id="players-bar" class="players-bar">
+        <div id="player-a" class="player-info">
+          <span id="player-a-name">ожидаем</span>
+          <span id="player-a-score" class="player-score"></span>
+        </div>
+        <div id="player-b" class="player-info">
+          <span id="player-b-score" class="player-score"></span>
+          <span id="player-b-name">ожидаем</span>
+        </div>
       </div>
     </div>
   `;
@@ -59,14 +67,6 @@ export function renderHost(appEl: HTMLDivElement): void {
     }
   };
 
-  const setStatusLobby = (text: string) => {
-    const el = document.querySelector<HTMLParagraphElement>("#status-lobby");
-    if (el) el.textContent = text;
-  };
-  const setStatusGame = (text: string) => {
-    const el = document.querySelector<HTMLParagraphElement>("#status-game");
-    if (el) el.textContent = text;
-  };
   const setRoomCodeDisplay = (code: string, visible: boolean) => {
     const el = document.querySelector<HTMLParagraphElement>("#room-code");
     if (!el) return;
@@ -99,6 +99,17 @@ export function renderHost(appEl: HTMLDivElement): void {
     window.setTimeout(() => panel.classList.remove("phase-transition"), 200);
   };
 
+  const renderPlayers = (room: RoomState) => {
+    const aName = document.querySelector<HTMLSpanElement>("#player-a-name");
+    const aScore = document.querySelector<HTMLSpanElement>("#player-a-score");
+    const bName = document.querySelector<HTMLSpanElement>("#player-b-name");
+    const bScore = document.querySelector<HTMLSpanElement>("#player-b-score");
+    if (aName) aName.textContent = room.playerA?.nickname ?? "ожидаем";
+    if (aScore) aScore.textContent = room.playerA ? String(room.playerA.score) : "";
+    if (bName) bName.textContent = room.playerB?.nickname ?? "ожидаем";
+    if (bScore) bScore.textContent = room.playerB ? String(room.playerB.score) : "";
+  };
+
   const renderQuestion = (room: RoomState) => {
     const area = document.querySelector<HTMLDivElement>("#question-area");
     const qText = document.querySelector<HTMLParagraphElement>("#question-text");
@@ -129,10 +140,34 @@ export function renderHost(appEl: HTMLDivElement): void {
     }
   };
 
-  setupBaseEvents(setStatusGame);
+  const renderFinish = (room: RoomState, reason?: string) => {
+    const el = document.querySelector<HTMLParagraphElement>("#finish-status");
+    if (!el) return;
+    if (room.phase !== "finished") {
+      el.style.display = "none";
+      return;
+    }
+    el.style.display = "";
+    if (reason === "player_disconnect") {
+      const a = room.playerA;
+      const b = room.playerB;
+      let leader = "Ничья";
+      if (a && b && a.score > b.score) leader = `Ведёт ${a.nickname}`;
+      else if (a && b && b.score > a.score) leader = `Ведёт ${b.nickname}`;
+      el.textContent = `Матч завершён — технические проблемы. ${leader}`;
+    } else {
+      if (room.winner === "draw") el.textContent = "Ничья!";
+      else if (room.winner === "playerA") el.textContent = `Победитель: ${room.playerA?.nickname ?? "A"}`;
+      else if (room.winner === "playerB") el.textContent = `Победитель: ${room.playerB?.nickname ?? "B"}`;
+      else el.textContent = "Матч завершён";
+    }
+  };
+
+  setupBaseEvents(() => {});
   let lastDeadline: number | null = null;
   let currentPhase: RoomState["phase"] = "lobby";
   let timerId: number | null = null;
+  let finishReason: string | undefined;
 
   const restartTimer = (deadlineTs: number | null, phase: RoomState["phase"]) => {
     lastDeadline = deadlineTs;
@@ -174,25 +209,27 @@ export function renderHost(appEl: HTMLDivElement): void {
     setRoomCode(payload.roomCode);
     setMyRole("host");
     showSection("lobby");
-    setStatusLobby("Отправь код комнаты игрокам.");
     setRoomCodeDisplay(payload.roomCode, true);
     deckSelect.style.display = "none";
     createBtn.style.display = "none";
     startBtn.style.display = "";
   });
 
+  socket.off(SERVER_TO_CLIENT.matchFinished);
+  socket.on(SERVER_TO_CLIENT.matchFinished, (payload: { winner: string | null; reason?: string }) => {
+    finishReason = payload.reason;
+  });
+
   socket.off(SERVER_TO_CLIENT.roomUpdated);
   socket.on(SERVER_TO_CLIENT.roomUpdated, (room: RoomState) => {
     setRoomCode(room.roomCode);
     showSection(room.phase);
-    const a = room.playerA ? `${room.playerA.nickname} (${room.playerA.score})` : "ожидаем";
-    const b = room.playerB ? `${room.playerB.nickname} (${room.playerB.score})` : "ожидаем";
-    setStatusLobby(`A: ${a} | B: ${b}`);
-    setStatusGame(`A: ${a} | B: ${b}`);
     setRoomCodeDisplay(room.roomCode, room.phase === "lobby");
     setPhaseVisual(room.phase);
     restartTimer(room.phaseDeadlineTs, room.phase);
+    renderPlayers(room);
     renderQuestion(room);
+    renderFinish(room, finishReason);
   });
 
   setPhaseVisual("lobby");
