@@ -40,7 +40,24 @@ function loadQuestions(deckSize: DeckSize): Question[] {
 function emitRoom(roomCode: string): void {
   const room = rooms.get(roomCode);
   if (!room) return;
-  io.to(roomCode).emit(SERVER_TO_CLIENT.roomUpdated, room);
+  const q = room.questions[room.currentRoundIndex] ?? null;
+  const publicState = {
+    roomCode: room.roomCode,
+    phase: room.phase,
+    deckSize: room.deckSize,
+    playerA: room.playerA ? { nickname: room.playerA.nickname, score: room.playerA.score } : null,
+    playerB: room.playerB ? { nickname: room.playerB.nickname, score: room.playerB.score } : null,
+    activePlayer: room.activePlayer,
+    currentRoundIndex: room.currentRoundIndex,
+    phaseDeadlineTs: room.phaseDeadlineTs,
+    paused: room.paused,
+    pauseDeadlineTs: room.pauseDeadlineTs,
+    winner: room.winner,
+    currentQuestion: q ? { text: q.text, options: q.options } : null,
+    activeAnswer: room.activeAnswer,
+    guessAnswer: room.guessAnswer,
+  };
+  io.to(roomCode).emit(SERVER_TO_CLIENT.roomUpdated, publicState);
 }
 
 function clearRoomTimer(roomCode: string): void {

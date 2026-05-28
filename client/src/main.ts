@@ -14,17 +14,10 @@ socket.on("connect", () => {
   socket.emit(CLIENT_TO_SERVER.clientReconnectRoom, { roomCode, roleHint: myRole ?? undefined, nickname });
 });
 
-if (path.startsWith("/host")) {
+if (path === "/" || path.startsWith("/host")) {
   renderHost(appEl);
 } else if (path.startsWith("/play")) {
-  renderMobile(appEl);
-} else {
-  appEl.innerHTML = `
-    <div class="panel">
-      <h2>AATE</h2>
-      <p class="muted">Открой /host для главного экрана или /play для телефона.</p>
-    </div>
-  `;
+  renderMobile(appEl, !!roomCode);
 }
 
 void bootPixiHint();

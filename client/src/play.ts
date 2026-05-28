@@ -1,42 +1,73 @@
 import { setupBaseEvents } from "./baseEvents";
 import { CLIENT_TO_SERVER, SERVER_TO_CLIENT } from "./events";
 import { socket } from "./socket";
-import { myRole, roomCode, setMyRole, setRoomCode } from "./state";
+import { myRole, resetState, roomCode, setMyRole, setRoomCode } from "./state";
 import { formatSecondsLeft, phaseColor, progressPercent } from "./timer";
 import type { RoomState } from "./types";
 
-export function renderMobile(appEl: HTMLDivElement): void {
+export function renderMobile(appEl: HTMLDivElement, reconnect: boolean): void {
   const last = localStorage.getItem("lastNickname") ?? "";
   appEl.innerHTML = `
     <div id="mobile-panel" class="panel">
-      <h2>AATE — Mobile</h2>
-      <input id="nickname" placeholder="Ник" value="${last}" />
-      <input id="room" placeholder="Код комнаты" />
-      <button id="join">Войти в комнату</button>
-      <p id="status" class="muted"></p>
-      <p id="turn" class="muted"></p>
-      <p id="timer" class="muted"></p>
-      <div class="timer-track"><div id="timer-bar" class="timer-bar"></div></div>
-      <div id="choices" class="row"></div>
+      <div id="section-connect">
+        <h2>AATE — Подключение</h2>
+        <input id="nickname" placeholder="Ник" value="${last}" />
+        <input id="room" placeholder="Код комнаты" />
+        <button id="join">Войти в комнату</button>
+        <p id="status-connect" class="muted"></p>
+      </div>
+
+      <div id="section-game" style="display:none">
+        <h2>AATE — Игра</h2>
+        <p id="room-info" class="muted"></p>
+        <p id="status-game" class="muted"></p>
+        <p id="turn" class="muted"></p>
+        <p id="timer" class="muted"></p>
+        <div class="timer-track"><div id="timer-bar" class="timer-bar"></div></div>
+        <div id="choices" class="row"></div>
+        <button id="disconnect" class="secondary">Отключиться</button>
+      </div>
     </div>
   `;
-  const setStatus = (text: string) => {
-    const status = document.querySelector<HTMLParagraphElement>("#status");
-    if (status) status.textContent = text;
+
+  const showSection = (section: "connect" | "game") => {
+    const connect = document.querySelector<HTMLDivElement>("#section-connect");
+    const game = document.querySelector<HTMLDivElement>("#section-game");
+    if (!connect || !game) return;
+    if (section === "connect") {
+      connect.style.display = "";
+      game.style.display = "none";
+    } else {
+      connect.style.display = "none";
+      game.style.display = "";
+    }
+  };
+
+  const setStatusConnect = (text: string) => {
+    const el = document.querySelector<HTMLParagraphElement>("#status-connect");
+    if (el) el.textContent = text;
+  };
+  const setStatusGame = (text: string) => {
+    const el = document.querySelector<HTMLParagraphElement>("#status-game");
+    if (el) el.textContent = text;
   };
   const setTurn = (text: string) => {
-    const turn = document.querySelector<HTMLParagraphElement>("#turn");
-    if (turn) turn.textContent = text;
+    const el = document.querySelector<HTMLParagraphElement>("#turn");
+    if (el) el.textContent = text;
   };
   const setTimer = (text: string) => {
-    const timer = document.querySelector<HTMLParagraphElement>("#timer");
-    if (timer) timer.textContent = text;
+    const el = document.querySelector<HTMLParagraphElement>("#timer");
+    if (el) el.textContent = text;
   };
   const setTimerBar = (percent: number, color: string) => {
     const bar = document.querySelector<HTMLDivElement>("#timer-bar");
     if (!bar) return;
     bar.style.width = `${percent}%`;
     bar.style.background = color;
+  };
+  const setRoomInfo = (code: string) => {
+    const el = document.querySelector<HTMLParagraphElement>("#room-info");
+    if (el) el.textContent = `Код комнаты: ${code}`;
   };
   const setPhaseVisual = (phase: RoomState["phase"]) => {
     const panel = document.querySelector<HTMLDivElement>("#mobile-panel");
@@ -85,34 +116,69 @@ export function renderMobile(appEl: HTMLDivElement): void {
       socket.emit(canAnswer ? CLIENT_TO_SERVER.playerSubmitActiveAnswer : CLIENT_TO_SERVER.playerSubmitGuessAnswer, { roomCode, value: 3 });
   };
 
-  setupBaseEvents(setStatus);
+  // Ошибки показываем на текущем активном экране
+  const isConnectVisible = () => {
+    const el = document.querySelector<HTMLDivElement>("#section-connect");
+    return el && el.style.display !== "none";
+  };
+  const setStatusDynamic = (text: string) => {
+    if (isConnectVisible()) setStatusConnect(text);
+    else setStatusGame(text);
+  };
+  setupBaseEvents(setStatusDynamic);
 
+  // --- Подключение ---
   (document.querySelector("#join") as HTMLButtonElement).onclick = () => {
     const nickname = (document.querySelector("#nickname") as HTMLInputElement).value.trim();
     const code = (document.querySelector("#room") as HTMLInputElement).value.trim().toUpperCase();
+    if (!nickname || !code) {
+      setStatusConnect("Введите ник и код комнаты.");
+      return;
+    }
     setRoomCode(code);
     localStorage.setItem("lastNickname", nickname);
     socket.emit(CLIENT_TO_SERVER.playerJoinRoom, { roomCode: code, nickname });
   };
 
+  // --- Отключение ---
+  (document.querySelector("#disconnect") as HTMLButtonElement).onclick = () => {
+    socket.disconnect();
+    resetState();
+    if (timerId) window.clearInterval(timerId);
+    timerId = null;
+    showSection("connect");
+    setStatusConnect("Отключено.");
+    socket.connect();
+  };
+
+  // --- События ---
   socket.off(SERVER_TO_CLIENT.playerJoined);
   socket.on(SERVER_TO_CLIENT.playerJoined, (payload: { role: "playerA" | "playerB"; roomCode: string }) => {
     setMyRole(payload.role);
     setRoomCode(payload.roomCode);
-    setStatus(`Подключен как ${payload.role} в комнате ${payload.roomCode}`);
+    setRoomInfo(payload.roomCode);
+    setStatusGame(`Подключен как ${payload.role}`);
+    showSection("game");
   });
 
   socket.off(SERVER_TO_CLIENT.roomUpdated);
   socket.on(SERVER_TO_CLIENT.roomUpdated, (room: RoomState) => {
     if (roomCode && room.roomCode !== roomCode) return;
+    setRoomInfo(room.roomCode);
     const activeNick = room.activePlayer === "playerA" ? room.playerA?.nickname : room.playerB?.nickname;
     setTurn(`Фаза: ${room.phase}. Ход: ${activeNick ?? room.activePlayer}`);
-    if (room.phase === "finished") setStatus(`Матч завершен. Победитель: ${room.winner ?? "не определен"}`);
+    if (room.phase === "finished") setStatusGame(`Матч завершен. Победитель: ${room.winner ?? "не определен"}`);
     setPhaseVisual(room.phase);
     restartTimer(room.phaseDeadlineTs, room.phase);
     renderChoices(room.phase, room.activePlayer);
   });
 
+  // --- Начальное состояние ---
   setPhaseVisual("lobby");
   restartTimer(null, "lobby");
+
+  if (reconnect) {
+    showSection("game");
+    setRoomInfo(roomCode);
+  }
 }

@@ -19,6 +19,9 @@ export type PublicRoomState = {
   paused: boolean;
   pauseDeadlineTs: number | null;
   winner: "playerA" | "playerB" | "draw" | null;
+  currentQuestion: { text: string; options: [string, string, string] } | null;
+  activeAnswer: 1 | 2 | 3 | null;
+  guessAnswer: 1 | 2 | 3 | null;
 };
 
 export const CLIENT_TO_SERVER = {

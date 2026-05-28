@@ -10,3 +10,8 @@ export function setRoomCode(code: string): void {
 export function setMyRole(role: Role | null): void {
   myRole = role;
 }
+
+export function resetState(): void {
+  roomCode = "";
+  myRole = null;
+}

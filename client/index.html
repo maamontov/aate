@@ -38,6 +38,36 @@
       .timer-track { width: 100%; height: 8px; border-radius: 999px; background: #efefef; overflow: hidden; margin-top: 6px; }
       .timer-bar { width: 0%; height: 100%; background: #777; transition: width 300ms linear, background 300ms linear; }
       hr { border: none; border-top: 1px solid #ececec; margin: 12px 0; }
+
+      /* Вопрос — крупный текст по центру */
+      .question-text {
+        font-size: 36px;
+        font-weight: 600;
+        text-align: center;
+        margin: 16px 0 24px;
+        line-height: 1.35;
+      }
+
+      /* Варианты ответов — крупные карточки в ряд */
+      .options-row {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+        margin: 16px 0;
+      }
+      .option-card {
+        padding: 20px 14px;
+        border: 2px solid #e6e6e6;
+        border-radius: 12px;
+        text-align: center;
+        font-size: 22px;
+        font-weight: 500;
+        line-height: 1.3;
+        transition: border-color 200ms, background 200ms;
+      }
+      .option-card.selected-active { border-color: #f2c94c; background: #fef9e7; }
+      .option-card.selected-guess { border-color: #eb5757; background: #fde8e8; }
+      .option-card.match { border-color: #27ae60; background: #e8f8f0; }
     </style>
   </head>
   <body>
