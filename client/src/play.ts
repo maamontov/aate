@@ -3,14 +3,22 @@ import { CLIENT_TO_SERVER, SERVER_TO_CLIENT } from "./events";
 import { socket } from "./socket";
 import { myRole, resetState, roomCode, setMyRole, setRoomCode } from "./state";
 import { formatSecondsLeft, phaseColor, progressPercent } from "./timer";
-import type { RoomState } from "./types";
+import type { Phase, RoomState } from "./types";
+
+const PHASE_LABELS: Record<Phase, string> = {
+  lobby: "Лобби",
+  question: "Вопрос",
+  answering: "Ответ",
+  guessing: "Угадай",
+  reveal: "Раскрытие",
+  finished: "Конец",
+};
 
 export function renderMobile(appEl: HTMLDivElement, reconnect: boolean): void {
   const last = localStorage.getItem("lastNickname") ?? "";
   appEl.innerHTML = `
     <div id="mobile-panel" class="panel">
       <div id="section-connect">
-        <h2>AATE — Подключение</h2>
         <input id="nickname" placeholder="Ник" value="${last}" />
         <input id="room" placeholder="Код комнаты" />
         <button id="join">Войти в комнату</button>
@@ -18,11 +26,9 @@ export function renderMobile(appEl: HTMLDivElement, reconnect: boolean): void {
       </div>
 
       <div id="section-game" style="display:none">
-        <h2>AATE — Игра</h2>
         <p id="room-info" class="muted"></p>
         <p id="status-game" class="muted"></p>
-        <p id="turn" class="muted"></p>
-        <p id="timer" class="muted"></p>
+        <p id="phase-timer" class="phase-timer"></p>
         <div class="timer-track"><div id="timer-bar" class="timer-bar"></div></div>
         <div id="choices" class="row"></div>
         <button id="disconnect" class="secondary">Отключиться</button>
@@ -51,12 +57,8 @@ export function renderMobile(appEl: HTMLDivElement, reconnect: boolean): void {
     const el = document.querySelector<HTMLParagraphElement>("#status-game");
     if (el) el.textContent = text;
   };
-  const setTurn = (text: string) => {
-    const el = document.querySelector<HTMLParagraphElement>("#turn");
-    if (el) el.textContent = text;
-  };
-  const setTimer = (text: string) => {
-    const el = document.querySelector<HTMLParagraphElement>("#timer");
+  const setPhaseTimer = (text: string) => {
+    const el = document.querySelector<HTMLParagraphElement>("#phase-timer");
     if (el) el.textContent = text;
   };
   const setTimerBar = (percent: number, color: string) => {
@@ -92,7 +94,9 @@ export function renderMobile(appEl: HTMLDivElement, reconnect: boolean): void {
     currentPhase = phase;
     if (timerId) window.clearInterval(timerId);
     const tick = () => {
-      setTimer(`Таймер: ${formatSecondsLeft(lastDeadline)}с`);
+      const label = PHASE_LABELS[currentPhase] ?? currentPhase;
+      const seconds = formatSecondsLeft(lastDeadline);
+      setPhaseTimer(`${label} · ${seconds}с`);
       setTimerBar(progressPercent(currentPhase, lastDeadline), phaseColor(currentPhase));
     };
     tick();
@@ -166,7 +170,7 @@ export function renderMobile(appEl: HTMLDivElement, reconnect: boolean): void {
     if (roomCode && room.roomCode !== roomCode) return;
     setRoomInfo(room.roomCode);
     const activeNick = room.activePlayer === "playerA" ? room.playerA?.nickname : room.playerB?.nickname;
-    setTurn(`Фаза: ${room.phase}. Ход: ${activeNick ?? room.activePlayer}`);
+    setStatusGame(`Ход: ${activeNick ?? room.activePlayer}`);
     if (room.phase === "finished") setStatusGame(`Матч завершен. Победитель: ${room.winner ?? "не определен"}`);
     setPhaseVisual(room.phase);
     restartTimer(room.phaseDeadlineTs, room.phase);

@@ -3,14 +3,21 @@ import { CLIENT_TO_SERVER, SERVER_TO_CLIENT } from "./events";
 import { socket } from "./socket";
 import { roomCode, setMyRole, setRoomCode } from "./state";
 import { formatSecondsLeft, phaseColor, progressPercent } from "./timer";
-import type { RoomState } from "./types";
+import type { Phase, RoomState } from "./types";
+
+const PHASE_LABELS: Record<Phase, string> = {
+  lobby: "Лобби",
+  question: "Вопрос",
+  answering: "Ответ",
+  guessing: "Угадай",
+  reveal: "Раскрытие",
+  finished: "Конец",
+};
 
 export function renderHost(appEl: HTMLDivElement): void {
   appEl.innerHTML = `
     <div id="host-panel" class="panel">
       <div id="section-lobby">
-        <h2>AATE — Конфигурация</h2>
-        <p class="muted">Создание комнаты и управление матчем.</p>
         <select id="deck-size">
           <option value="" disabled selected>Выберите режим игры</option>
           <option value="10">Быстрый (10 вопросов)</option>
@@ -19,14 +26,12 @@ export function renderHost(appEl: HTMLDivElement): void {
         </select>
         <button id="create">Создать комнату</button>
         <button id="start">Старт матча</button>
+        <p id="room-code" class="room-code" style="display:none"></p>
         <hr />
         <p id="status-lobby" class="muted"></p>
-        <p id="state-lobby" class="muted"></p>
       </div>
       <div id="section-game" style="display:none">
-        <h2>AATE — Матч</h2>
         <p id="status-game" class="muted"></p>
-        <p id="state-game" class="muted"></p>
         <div id="question-area" style="display:none">
           <p id="question-text" class="question-text"></p>
           <div id="options-row" class="options-row">
@@ -35,7 +40,7 @@ export function renderHost(appEl: HTMLDivElement): void {
             <div id="opt-3" class="option-card"></div>
           </div>
         </div>
-        <p id="timer" class="muted"></p>
+        <p id="phase-timer" class="phase-timer"></p>
         <div class="timer-track"><div id="timer-bar" class="timer-bar"></div></div>
       </div>
     </div>
@@ -58,21 +63,19 @@ export function renderHost(appEl: HTMLDivElement): void {
     const el = document.querySelector<HTMLParagraphElement>("#status-lobby");
     if (el) el.textContent = text;
   };
-  const setStateLobby = (text: string) => {
-    const el = document.querySelector<HTMLParagraphElement>("#state-lobby");
-    if (el) el.textContent = text;
-  };
   const setStatusGame = (text: string) => {
     const el = document.querySelector<HTMLParagraphElement>("#status-game");
     if (el) el.textContent = text;
   };
-  const setStateGame = (text: string) => {
-    const el = document.querySelector<HTMLParagraphElement>("#state-game");
-    if (el) el.textContent = text;
+  const setRoomCodeDisplay = (code: string, visible: boolean) => {
+    const el = document.querySelector<HTMLParagraphElement>("#room-code");
+    if (!el) return;
+    el.textContent = code;
+    el.style.display = visible ? "" : "none";
   };
-  const setTimer = (text: string) => {
-    const timer = document.querySelector<HTMLParagraphElement>("#timer");
-    if (timer) timer.textContent = text;
+  const setPhaseTimer = (text: string) => {
+    const el = document.querySelector<HTMLParagraphElement>("#phase-timer");
+    if (el) el.textContent = text;
   };
   const setTimerBar = (percent: number, color: string) => {
     const bar = document.querySelector<HTMLDivElement>("#timer-bar");
@@ -136,7 +139,9 @@ export function renderHost(appEl: HTMLDivElement): void {
     currentPhase = phase;
     if (timerId) window.clearInterval(timerId);
     const tick = () => {
-      setTimer(`Таймер: ${formatSecondsLeft(lastDeadline)}с`);
+      const label = PHASE_LABELS[currentPhase] ?? currentPhase;
+      const seconds = formatSecondsLeft(lastDeadline);
+      setPhaseTimer(`${label} · ${seconds}с`);
       setTimerBar(progressPercent(currentPhase, lastDeadline), phaseColor(currentPhase));
     };
     tick();
@@ -169,8 +174,8 @@ export function renderHost(appEl: HTMLDivElement): void {
     setRoomCode(payload.roomCode);
     setMyRole("host");
     showSection("lobby");
-    setStatusLobby(`Комната создана: ${payload.roomCode}`);
-    setStateLobby("Отправь код комнаты игрокам.");
+    setStatusLobby("Отправь код комнаты игрокам.");
+    setRoomCodeDisplay(payload.roomCode, true);
     deckSelect.style.display = "none";
     createBtn.style.display = "none";
     startBtn.style.display = "";
@@ -182,9 +187,9 @@ export function renderHost(appEl: HTMLDivElement): void {
     showSection(room.phase);
     const a = room.playerA ? `${room.playerA.nickname} (${room.playerA.score})` : "ожидаем";
     const b = room.playerB ? `${room.playerB.nickname} (${room.playerB.score})` : "ожидаем";
-    setStatusLobby(`Код: ${room.roomCode} | A: ${a} | B: ${b}`);
-    setStatusGame(`Код: ${room.roomCode} | A: ${a} | B: ${b}`);
-    setStateGame(`Фаза: ${room.phase} | Раунд: ${Math.min(room.currentRoundIndex + 1, room.deckSize)}/${room.deckSize}`);
+    setStatusLobby(`A: ${a} | B: ${b}`);
+    setStatusGame(`A: ${a} | B: ${b}`);
+    setRoomCodeDisplay(room.roomCode, room.phase === "lobby");
     setPhaseVisual(room.phase);
     restartTimer(room.phaseDeadlineTs, room.phase);
     renderQuestion(room);
