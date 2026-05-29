@@ -21,9 +21,9 @@ const rooms = new Map<string, RoomState>();
 const timers = new Map<string, NodeJS.Timeout>();
 const pauseTimers = new Map<string, NodeJS.Timeout>();
 const disconnectedSockets = new Map<string, Set<string>>();
-const ANSWER_MS = 15_000;
-const GUESS_MS = 15_000;
-const REVEAL_MS = 4_000;
+const ANSWER_MS = 20_000;
+const GUESS_MS = 20_000;
+const REVEAL_MS = 5_000;
 const PAUSE_ON_DISCONNECT_MS = 30_000;
 
 function randomRoomCode(): string {
@@ -123,7 +123,7 @@ function startRound(roomCode: string): void {
 
   room.activeAnswer = null;
   room.guessAnswer = null;
-  nextPhase(roomCode, "question", 2_000);
+  nextPhase(roomCode, "question", 3_000);
   timers.set(
     roomCode,
     setTimeout(() => {
@@ -144,7 +144,7 @@ function startRound(roomCode: string): void {
           );
         }, ANSWER_MS)
       );
-    }, 2_000)
+    }, 3_000)
   );
 }
 

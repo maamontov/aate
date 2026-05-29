@@ -25,6 +25,11 @@
         display: flex;
         flex-direction: column;
       }
+      .section-game {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+      }
       .panel.mobile-panel {
         width: 100vw;
         max-width: 100vw;
@@ -73,6 +78,40 @@
 
       .muted { color: #4f4f4f; font-size: 14px; transition: color 220ms ease; }
       hr { border: none; border-top: 1px solid #ececec; margin: 12px 0; }
+
+      /* Анимации */
+      @keyframes fadeInUp {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+
+      #question-area {
+        animation: fadeInUp 400ms ease-out;
+      }
+      .option-card {
+        animation: fadeInUp 400ms ease-out backwards;
+      }
+      .options-row-top .option-card:nth-child(1) { animation-delay: 100ms; }
+      .options-row-top .option-card:nth-child(2) { animation-delay: 200ms; }
+      .options-row-bottom .option-card { animation-delay: 300ms; }
+
+      #finish-status {
+        animation: fadeIn 500ms ease-out;
+      }
+      .finish-winner {
+        font-size: clamp(36px, 6vw, 72px);
+        font-weight: 700;
+        margin-bottom: 16px;
+      }
+      .finish-score {
+        font-size: clamp(24px, 4vw, 48px);
+        font-weight: 600;
+        color: #4f4f4f;
+      }
 
       /* Вопрос — крупный адаптивный текст */
       .question-text {
@@ -132,7 +171,9 @@
         justify-content: space-between;
         align-items: stretch;
         gap: 24px;
-        margin-bottom: 32px;
+        flex-shrink: 0;
+        padding-bottom: 16px;
+        border-bottom: 2px solid #ececec;
       }
       .player-block {
         display: flex;
@@ -192,6 +233,9 @@
         border-radius: 6px;
         margin-bottom: 12px;
         display: inline-block;
+      }
+      .question-container {
+        text-align: center;
       }
 
       /* Варианты ответов — сетка 2+1 */
@@ -285,8 +329,9 @@
 
       /* Низ: таймер с текстом внутри */
       .game-footer {
-        margin-top: auto;
-        padding-top: 24px;
+        flex-shrink: 0;
+        padding-top: 16px;
+        border-top: 2px solid #ececec;
       }
       .timer-track {
         position: relative;

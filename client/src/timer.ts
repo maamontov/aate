@@ -2,10 +2,10 @@ import type { Phase } from "./types";
 
 const PHASE_MS: Record<Phase, number> = {
   lobby: 0,
-  question: 2_000,
-  answering: 15_000,
-  guessing: 15_000,
-  reveal: 4_000,
+  question: 3_000,
+  answering: 20_000,
+  guessing: 20_000,
+  reveal: 5_000,
   finished: 0
 };
 

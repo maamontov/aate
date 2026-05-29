@@ -1,4 +1,4 @@
-export type DeckSize = 10 | 20 | 40;
+export type DeckSize = 10 | 15 | 20 | 40;
 export type Role = "host" | "playerA" | "playerB";
 export type Phase = "lobby" | "question" | "answering" | "guessing" | "reveal" | "finished";
 

@@ -18,17 +18,10 @@ export function renderHost(appEl: HTMLDivElement): void {
   appEl.innerHTML = `
     <div id="host-panel" class="panel host-panel">
       <div id="section-lobby">
-        <select id="deck-size">
-          <option value="" disabled selected>Выберите режим игры</option>
-          <option value="10">Быстрый (10 вопросов)</option>
-          <option value="20">Средний (20 вопросов)</option>
-          <option value="40">Полный (40 вопросов)</option>
-        </select>
-        <button id="create">Создать комнату</button>
+        <p id="room-code" class="room-code"></p>
         <button id="start">Старт матча</button>
-        <p id="room-code" class="room-code" style="display:none"></p>
       </div>
-      <div id="section-game" style="display:none">
+      <div id="section-game" class="section-game" style="display:none">
         <!-- Шапка: игроки -->
         <div class="game-header">
           <div class="player-block player-left">
@@ -66,7 +59,10 @@ export function renderHost(appEl: HTMLDivElement): void {
             </div>
           </div>
 
-          <p id="finish-status" class="finish-status" style="display:none"></p>
+          <div id="finish-status" class="finish-status" style="display:none">
+            <div class="finish-winner"></div>
+            <div class="finish-score"></div>
+          </div>
         </div>
 
         <!-- Низ: таймер с текстом внутри -->
@@ -89,7 +85,7 @@ export function renderHost(appEl: HTMLDivElement): void {
       game.style.display = "none";
     } else {
       lobby.style.display = "none";
-      game.style.display = "";
+      game.style.display = "flex";
     }
   };
 
@@ -172,25 +168,46 @@ export function renderHost(appEl: HTMLDivElement): void {
   };
 
   const renderFinish = (room: RoomState, reason?: string) => {
-    const el = document.querySelector<HTMLParagraphElement>("#finish-status");
+    const el = document.querySelector<HTMLDivElement>("#finish-status");
+    const options = document.querySelector<HTMLDivElement>("#options-area");
+    const question = document.querySelector<HTMLDivElement>("#question-area");
     if (!el) return;
+    
     if (room.phase !== "finished") {
       el.style.display = "none";
+      if (options) options.style.display = "";
       return;
     }
+    
+    // Скрыть ответы и вопрос
+    if (options) options.style.display = "none";
+    if (question) question.style.display = "none";
+    
     el.style.display = "";
+    const winnerEl = el.querySelector<HTMLDivElement>(".finish-winner");
+    const scoreEl = el.querySelector<HTMLDivElement>(".finish-score");
+    
+    const a = room.playerA;
+    const b = room.playerB;
+    const scoreText = a && b ? `${a.nickname}: ${a.score} — ${b.score} :${b.nickname}` : "";
+    
     if (reason === "player_disconnect") {
-      const a = room.playerA;
-      const b = room.playerB;
       let leader = "Ничья";
       if (a && b && a.score > b.score) leader = `Ведёт ${a.nickname}`;
       else if (a && b && b.score > a.score) leader = `Ведёт ${b.nickname}`;
-      el.textContent = `Матч завершён — технические проблемы. ${leader}`;
+      if (winnerEl) winnerEl.textContent = "Матч завершён";
+      if (scoreEl) scoreEl.textContent = `${leader} · ${scoreText}`;
     } else {
-      if (room.winner === "draw") el.textContent = "Ничья!";
-      else if (room.winner === "playerA") el.textContent = `Победитель: ${room.playerA?.nickname ?? "A"}`;
-      else if (room.winner === "playerB") el.textContent = `Победитель: ${room.playerB?.nickname ?? "B"}`;
-      else el.textContent = "Матч завершён";
+      if (room.winner === "draw") {
+        if (winnerEl) winnerEl.textContent = "Ничья!";
+      } else if (room.winner === "playerA") {
+        if (winnerEl) winnerEl.textContent = `Победитель: ${a?.nickname ?? "A"}`;
+      } else if (room.winner === "playerB") {
+        if (winnerEl) winnerEl.textContent = `Победитель: ${b?.nickname ?? "B"}`;
+      } else {
+        if (winnerEl) winnerEl.textContent = "Матч завершён";
+      }
+      if (scoreEl) scoreEl.textContent = scoreText;
     }
   };
 
@@ -214,35 +231,21 @@ export function renderHost(appEl: HTMLDivElement): void {
     if (deadlineTs && phase !== "lobby" && phase !== "finished") timerId = window.setInterval(tick, 500);
   };
 
-  // --- Lobby: dropdown + кнопки ---
-  const deckSelect = document.querySelector<HTMLSelectElement>("#deck-size")!;
-  const createBtn = document.querySelector<HTMLButtonElement>("#create")!;
+  // --- Lobby: кнопка старта ---
   const startBtn = document.querySelector<HTMLButtonElement>("#start")!;
-
-  createBtn.style.display = "none";
   startBtn.style.display = "none";
 
-  deckSelect.onchange = () => {
-    createBtn.style.display = deckSelect.value ? "" : "none";
-  };
-
-  createBtn.onclick = () => {
-    const size = Number(deckSelect.value) as 10 | 20 | 40;
-    if (!size) return;
-    socket.emit(CLIENT_TO_SERVER.hostCreateRoom, { deckSize: size });
-  };
-
   startBtn.onclick = () => socket.emit(CLIENT_TO_SERVER.hostStartMatch, { roomCode });
+
+  // Автоматически создаём комнату при загрузке
+  socket.emit(CLIENT_TO_SERVER.hostCreateRoom, { deckSize: 15 });
 
   // --- События ---
   socket.off(SERVER_TO_CLIENT.roomCreated);
   socket.on(SERVER_TO_CLIENT.roomCreated, (payload: { roomCode: string }) => {
     setRoomCode(payload.roomCode);
     setMyRole("host");
-    showSection("lobby");
     setRoomCodeDisplay(payload.roomCode, true);
-    deckSelect.style.display = "none";
-    createBtn.style.display = "none";
     startBtn.style.display = "";
   });
 
