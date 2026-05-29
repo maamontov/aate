@@ -26,8 +26,10 @@ export function renderMobile(appEl: HTMLDivElement, reconnect: boolean): void {
       </div>
 
       <div id="section-game" class="section-game" style="display:none">
-        <div class="game-center">
+        <div class="game-header-player">
           <div id="question-badge" class="question-number" style="display:none"></div>
+        </div>
+        <div class="game-center">
           <p id="status-game" class="status-game"></p>
           <p id="finish-status" class="finish-status" style="display:none"></p>
           <div id="choices" class="choices-vertical"></div>
@@ -97,6 +99,13 @@ export function renderMobile(appEl: HTMLDivElement, reconnect: boolean): void {
     lastDeadline = deadlineTs;
     currentPhase = phase;
     if (timerId) window.clearInterval(timerId);
+
+    if (phase === "lobby" || phase === "finished") {
+      setPhaseTimer("", "");
+      setTimerBar(0, phaseColor(phase));
+      return;
+    }
+
     const tick = () => {
       const label = PHASE_LABELS[currentPhase] ?? currentPhase;
       const seconds = formatSecondsLeft(lastDeadline);
@@ -104,7 +113,7 @@ export function renderMobile(appEl: HTMLDivElement, reconnect: boolean): void {
       setTimerBar(progressPercent(currentPhase, lastDeadline), phaseColor(currentPhase));
     };
     tick();
-    if (deadlineTs && phase !== "lobby" && phase !== "finished") timerId = window.setInterval(tick, 500);
+    if (deadlineTs) timerId = window.setInterval(tick, 500);
   };
 
   const renderChoices = (room: RoomState) => {
