@@ -101,7 +101,7 @@ export function renderMobile(appEl: HTMLDivElement, reconnect: boolean): void {
   let timerId: number | null = null;
   let finishReason: string | undefined;
 
-  const restartTimer = (deadlineTs: number | null, phase: RoomState["phase"]) => {
+  const restartTimer = (deadlineTs: number | null, phase: RoomState["phase"], paused = false) => {
     lastDeadline = deadlineTs;
     currentPhase = phase;
     if (timerId) window.clearInterval(timerId);
@@ -119,7 +119,7 @@ export function renderMobile(appEl: HTMLDivElement, reconnect: boolean): void {
       setTimerBar(progressPercent(currentPhase, lastDeadline), phaseColor(currentPhase));
     };
     tick();
-    if (deadlineTs) timerId = window.setInterval(tick, 500);
+    if (deadlineTs && !paused) timerId = window.setInterval(tick, 500);
   };
 
   const renderChoices = (room: RoomState) => {
@@ -230,12 +230,14 @@ export function renderMobile(appEl: HTMLDivElement, reconnect: boolean): void {
     
     if (room.phase === "lobby") {
       setStatusGame("Ждём начала игры");
+    } else if (room.phase === "finished") {
+      setStatusGame("");
     } else {
       const activeNick = room.activePlayer === "playerA" ? room.playerA?.nickname : room.playerB?.nickname;
       setStatusGame(`Сейчас ходит ${activeNick ?? room.activePlayer}`);
     }
     setPhaseVisual(room.phase);
-    restartTimer(room.phaseDeadlineTs, room.phase);
+    restartTimer(room.phaseDeadlineTs, room.phase, room.paused);
     renderChoices(room);
     renderFinish(room, finishReason);
 
