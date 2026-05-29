@@ -25,13 +25,17 @@ export function renderMobile(appEl: HTMLDivElement, reconnect: boolean): void {
         <p id="status-connect" class="muted"></p>
       </div>
 
-      <div id="section-game" style="display:none">
-        <p id="status-game" class="status-game"></p>
-        <p id="finish-status" class="finish-status" style="display:none"></p>
-        <div id="choices" class="choices-vertical"></div>
-        <div class="timer-track">
-          <div id="timer-bar" class="timer-bar"></div>
-          <span id="timer-text" class="timer-text"></span>
+      <div id="section-game" class="section-game" style="display:none">
+        <div class="game-center">
+          <p id="status-game" class="status-game"></p>
+          <p id="finish-status" class="finish-status" style="display:none"></p>
+          <div id="choices" class="choices-vertical"></div>
+        </div>
+        <div class="game-footer">
+          <div class="timer-track">
+            <div id="timer-bar" class="timer-bar"></div>
+            <span id="timer-text" class="timer-text"></span>
+          </div>
         </div>
       </div>
     </div>
@@ -46,7 +50,7 @@ export function renderMobile(appEl: HTMLDivElement, reconnect: boolean): void {
       game.style.display = "none";
     } else {
       connect.style.display = "none";
-      game.style.display = "";
+      game.style.display = "flex";
     }
   };
 
