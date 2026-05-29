@@ -326,6 +326,27 @@
         background: #333333;
         border-color: #333333;
       }
+      .choices-vertical button.choice-disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        background: #f5f5f5;
+        color: #999;
+      }
+      .choices-vertical button.choice-disabled:hover {
+        transform: none;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        background: #f5f5f5;
+        color: #999;
+        border-color: #d9d9d9;
+      }
+
+      /* Статус игрока */
+      .status-game {
+        text-align: center;
+        font-size: clamp(18px, 3vw, 28px);
+        font-weight: 600;
+        margin: 12px 0;
+      }
 
       /* Низ: таймер с текстом внутри */
       .game-footer {

@@ -26,11 +26,13 @@ export function renderMobile(appEl: HTMLDivElement, reconnect: boolean): void {
       </div>
 
       <div id="section-game" style="display:none">
-        <p id="status-game" class="muted"></p>
+        <p id="status-game" class="status-game"></p>
         <p id="finish-status" class="finish-status" style="display:none"></p>
-        <p id="phase-timer" class="phase-timer"></p>
-        <div class="timer-track"><div id="timer-bar" class="timer-bar"></div></div>
         <div id="choices" class="choices-vertical"></div>
+        <div class="timer-track">
+          <div id="timer-bar" class="timer-bar"></div>
+          <span id="timer-text" class="timer-text"></span>
+        </div>
       </div>
     </div>
   `;
@@ -56,9 +58,9 @@ export function renderMobile(appEl: HTMLDivElement, reconnect: boolean): void {
     const el = document.querySelector<HTMLParagraphElement>("#status-game");
     if (el) el.textContent = text;
   };
-  const setPhaseTimer = (text: string) => {
-    const el = document.querySelector<HTMLParagraphElement>("#phase-timer");
-    if (el) el.textContent = text;
+  const setPhaseTimer = (label: string, seconds: string) => {
+    const el = document.querySelector<HTMLSpanElement>("#timer-text");
+    if (el) el.textContent = `${label} · ${seconds}`;
   };
   const setTimerBar = (percent: number, color: string) => {
     const bar = document.querySelector<HTMLDivElement>("#timer-bar");
@@ -93,7 +95,7 @@ export function renderMobile(appEl: HTMLDivElement, reconnect: boolean): void {
     const tick = () => {
       const label = PHASE_LABELS[currentPhase] ?? currentPhase;
       const seconds = formatSecondsLeft(lastDeadline);
-      setPhaseTimer(`${label} · ${seconds}с`);
+      setPhaseTimer(label, seconds);
       setTimerBar(progressPercent(currentPhase, lastDeadline), phaseColor(currentPhase));
     };
     tick();
@@ -104,20 +106,30 @@ export function renderMobile(appEl: HTMLDivElement, reconnect: boolean): void {
     const c = document.querySelector<HTMLDivElement>("#choices");
     if (!c || !roomCode || !myRole) return;
     c.innerHTML = "";
+
     const iAmActive = myRole === room.activePlayer;
     const canAnswer = room.phase === "answering" && iAmActive;
     const canGuess = room.phase === "guessing" && !iAmActive;
-    if (!canAnswer && !canGuess) return;
+    const isActive = canAnswer || canGuess;
+    const showOptions = room.phase === "answering" || room.phase === "guessing" || room.phase === "reveal";
+
+    if (!showOptions) return;
 
     const options = room.currentQuestion?.options ?? ["1", "2", "3"];
     for (let i = 0; i < 3; i++) {
       const btn = document.createElement("button");
       btn.textContent = options[i];
-      btn.onclick = () =>
-        socket.emit(
-          canAnswer ? CLIENT_TO_SERVER.playerSubmitActiveAnswer : CLIENT_TO_SERVER.playerSubmitGuessAnswer,
-          { roomCode, value: i + 1 }
-        );
+
+      if (isActive) {
+        btn.onclick = () =>
+          socket.emit(
+            canAnswer ? CLIENT_TO_SERVER.playerSubmitActiveAnswer : CLIENT_TO_SERVER.playerSubmitGuessAnswer,
+            { roomCode, value: i + 1 }
+          );
+      } else {
+        btn.disabled = true;
+        btn.classList.add("choice-disabled");
+      }
       c.appendChild(btn);
     }
   };
@@ -187,7 +199,7 @@ export function renderMobile(appEl: HTMLDivElement, reconnect: boolean): void {
   socket.on(SERVER_TO_CLIENT.roomUpdated, (room: RoomState) => {
     if (roomCode && room.roomCode !== roomCode) return;
     const activeNick = room.activePlayer === "playerA" ? room.playerA?.nickname : room.playerB?.nickname;
-    setStatusGame(`Ход: ${activeNick ?? room.activePlayer}`);
+    setStatusGame(`Сейчас ходит ${activeNick ?? room.activePlayer}`);
     setPhaseVisual(room.phase);
     restartTimer(room.phaseDeadlineTs, room.phase);
     renderChoices(room);
