@@ -1,0 +1,495 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AATE</title>
+    <style>
+      *, *::before, *::after { box-sizing: border-box; }
+      html, body { margin: 0; padding: 0; background: #ffffff; color: #111111; font-family: Inter, Arial, sans-serif; }
+      #app { min-height: 100vh; display: grid; place-items: center; }
+
+      .panel {
+        width: min(680px, 92vw);
+        padding: 20px;
+        border: 1px solid #e6e6e6;
+        border-radius: 14px;
+        background: #ffffff;
+        box-shadow: 0 6px 20px rgba(0,0,0,0.04);
+        transition: transform 220ms ease, box-shadow 220ms ease, border-color 220ms ease;
+      }
+      .panel.host-panel {
+        width: 96vw;
+        max-width: 1200px;
+        min-height: 95vh;
+        display: flex;
+        flex-direction: column;
+      }
+      .section-game {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        position: relative;
+      }
+      .section-lobby {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+      }
+      .game-header-player {
+        display: flex;
+        justify-content: center;
+        padding: 16px 0;
+        flex-shrink: 0;
+      }
+      .panel.mobile-panel {
+        width: 100vw;
+        max-width: 100vw;
+        min-height: 100vh;
+        border-radius: 0;
+        border: none;
+        display: flex;
+        flex-direction: column;
+      }
+      .panel.phase-transition { transform: translateY(-2px); }
+      .panel.phase-question { border-color: #2f80ed; box-shadow: 0 6px 20px rgba(47,128,237,0.12); }
+      .panel.phase-answering { border-color: #f2c94c; box-shadow: 0 6px 20px rgba(242,201,76,0.14); }
+      .panel.phase-guessing { border-color: #eb5757; box-shadow: 0 6px 20px rgba(235,87,87,0.14); }
+      .panel.phase-reveal { border-color: #27ae60; box-shadow: 0 6px 20px rgba(39,174,96,0.14); }
+      .panel.phase-finished { border-color: #111111; }
+
+      input, select, button {
+        width: 100%;
+        margin: 12px 0;
+        padding: 14px 20px;
+        border-radius: 12px;
+        border: 2px solid #d9d9d9;
+        background: #ffffff;
+        color: #111111;
+        font-size: 18px;
+        font-weight: 500;
+      }
+      button { 
+        cursor: pointer; 
+        transition: background 150ms ease, color 150ms ease, border-color 150ms ease, transform 100ms ease; 
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+      }
+      button:hover { 
+        background: #111111; 
+        color: #ffffff; 
+        border-color: #111111; 
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(0,0,0,0.15);
+      }
+      button:active { 
+        transform: translateY(1px); 
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        background: #333333;
+        border-color: #333333;
+      }
+
+      /* Пауза */
+      .pause-btn {
+        margin-top: 24px;
+        padding: 12px 36px;
+        font-size: 16px;
+        font-weight: 600;
+        border-radius: 10px;
+        border: 2px solid #666;
+        background: #666;
+        color: #fff;
+        cursor: pointer;
+        width: auto;
+        align-self: center;
+      }
+      .pause-btn:hover {
+        background: #444;
+        border-color: #444;
+      }
+      .pause-overlay {
+        position: absolute;
+        inset: 0;
+        background: rgba(255, 255, 255, 0.93);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 100;
+        border-radius: 14px;
+      }
+      .pause-text {
+        font-size: clamp(48px, 10vw, 96px);
+        font-weight: 800;
+        color: #111;
+        letter-spacing: 4px;
+      }
+      .pause-info {
+        font-size: 20px;
+        color: #666;
+        margin-top: 12px;
+      }
+      .pause-resume-btn {
+        margin-top: 24px;
+        padding: 14px 48px;
+        font-size: 18px;
+        font-weight: 600;
+        border-radius: 12px;
+        border: 2px solid #111;
+        background: #111;
+        color: #fff;
+        cursor: pointer;
+        width: auto;
+      }
+      .pause-resume-btn:hover {
+        background: #333;
+        border-color: #333;
+      }
+
+      .muted { color: #4f4f4f; font-size: 14px; transition: color 220ms ease; }
+      hr { border: none; border-top: 1px solid #ececec; margin: 12px 0; }
+
+      /* Анимации */
+      @keyframes fadeInUp {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+
+      #question-area {
+        animation: fadeInUp 400ms ease-out;
+      }
+      .option-card {
+        animation: fadeInUp 400ms ease-out backwards;
+      }
+      .options-row-top .option-card:nth-child(1) { animation-delay: 100ms; }
+      .options-row-top .option-card:nth-child(2) { animation-delay: 200ms; }
+      .options-row-bottom .option-card { animation-delay: 300ms; }
+
+      #finish-status {
+        animation: fadeIn 500ms ease-out;
+      }
+      .finish-winner {
+        font-size: clamp(36px, 6vw, 72px);
+        font-weight: 700;
+        margin-bottom: 16px;
+      }
+      .finish-score {
+        font-size: clamp(24px, 4vw, 48px);
+        font-weight: 600;
+        color: #4f4f4f;
+      }
+
+      /* Вопрос — крупный адаптивный текст */
+      .question-text {
+        font-size: clamp(28px, 4vw, 48px);
+        font-weight: 600;
+        text-align: center;
+        margin: 16px 0 24px;
+        line-height: 1.35;
+      }
+
+      /* Варианты ответов — крупные карточки (для хоста) */
+      .options-row {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 16px;
+        margin: 20px 0;
+      }
+      .option-card {
+        padding: 24px 18px;
+        border: 2px solid #e6e6e6;
+        border-radius: 14px;
+        text-align: center;
+        font-size: clamp(20px, 3vw, 32px);
+        font-weight: 500;
+        line-height: 1.3;
+        transition: border-color 200ms, background 200ms, transform 150ms ease;
+      }
+      .option-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 6px 20px rgba(0,0,0,0.1);
+      }
+      .option-card.selected-active { border-color: #f2c94c; background: #fef9e7; }
+      .option-card.selected-guess { border-color: #eb5757; background: #fde8e8; }
+      .option-card.match { border-color: #27ae60; background: #e8f8f0; }
+
+      /* Код комнаты — крупный по центру */
+      .room-code {
+        font-size: clamp(36px, 6vw, 72px);
+        font-weight: 700;
+        text-align: center;
+        letter-spacing: 8px;
+        font-family: 'Courier New', monospace;
+        margin: 24px 0;
+      }
+
+      /* Фаза + таймер — по центру */
+      .phase-timer {
+        text-align: center;
+        font-size: 16px;
+        color: #4f4f4f;
+        margin: 12px 0 4px;
+      }
+
+      /* Блок игроков — верхняя панель */
+      .game-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: stretch;
+        gap: 24px;
+        flex-shrink: 0;
+        padding-bottom: 16px;
+        border-bottom: 2px solid #ececec;
+      }
+      .player-block {
+        display: flex;
+        align-items: stretch;
+        flex: 1;
+        border: 2px solid #e6e6e6;
+        border-radius: 12px;
+        overflow: hidden;
+      }
+      .player-score {
+        background: #f5f5f5;
+        padding: 16px 24px;
+        font-size: clamp(28px, 4vw, 48px);
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        min-width: 80px;
+        justify-content: center;
+      }
+      .player-name {
+        padding: 16px 24px;
+        font-size: clamp(18px, 2.5vw, 28px);
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        flex: 1;
+      }
+      .player-left { flex-direction: row; }
+      .player-right { flex-direction: row-reverse; }
+
+      /* Центр: вопрос + ответы */
+      .game-center {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        padding: 16px 0;
+      }
+
+      /* Вопрос — крупный адаптивный текст */
+      .question-text {
+        font-size: clamp(28px, 4vw, 48px);
+        font-weight: 600;
+        text-align: center;
+        margin: 16px 0 24px;
+        line-height: 1.35;
+      }
+
+      /* Номер вопроса */
+      .question-number {
+        font-size: 14px;
+        font-weight: 600;
+        text-transform: uppercase;
+        background: #111111;
+        color: #ffffff;
+        padding: 4px 12px;
+        border-radius: 6px;
+        margin-bottom: 12px;
+        display: inline-block;
+      }
+      .question-container {
+        text-align: center;
+      }
+
+      /* Варианты ответов — сетка 2+1 */
+      .options-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        margin: 16px 0;
+      }
+      .options-row-top {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+      }
+      .options-row-bottom {
+        display: flex;
+        justify-content: center;
+      }
+      .options-row-bottom .option-card {
+        width: calc(50% - 6px);
+      }
+      .option-card {
+        padding: 24px 18px;
+        border: 2px solid #e6e6e6;
+        border-radius: 14px;
+        text-align: center;
+        font-size: clamp(20px, 3vw, 32px);
+        font-weight: 500;
+        line-height: 1.3;
+        transition: border-color 200ms, background 200ms, transform 150ms ease;
+      }
+      .option-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 6px 20px rgba(0,0,0,0.1);
+      }
+      .option-card.selected-active { border-color: #f2c94c; background: #fef9e7; }
+      .option-card.selected-guess { border-color: #eb5757; background: #fde8e8; }
+      .option-card.match { border-color: #27ae60; background: #e8f8f0; }
+
+      /* Код комнаты — крупный по центру */
+      .room-code {
+        font-size: clamp(36px, 6vw, 72px);
+        font-weight: 700;
+        text-align: center;
+        letter-spacing: 8px;
+        font-family: 'Courier New', monospace;
+        margin: 24px 0;
+      }
+
+      /* Лобби — игроки */
+      .lobby-players {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        margin: 24px 0;
+      }
+      .lobby-player {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 18px;
+      }
+      .lobby-dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: #ccc;
+        transition: background 200ms ease;
+      }
+      .lobby-player.connected .lobby-dot {
+        background: #27ae60;
+      }
+      button:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+      button:disabled:hover {
+        background: #ffffff;
+        color: #111111;
+        border-color: #d9d9d9;
+        transform: none;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+      }
+
+      /* Статус завершения */
+      .finish-status {
+        text-align: center;
+        font-size: clamp(18px, 2.5vw, 28px);
+        font-weight: 500;
+        margin: 16px 0;
+        line-height: 1.4;
+      }
+
+      /* Варианты ответов — вертикальные (для игрока) */
+      .choices-vertical {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        margin: 20px 0;
+      }
+      .choices-vertical button {
+        padding: 24px;
+        font-size: 22px;
+        border-radius: 14px;
+        text-align: left;
+        font-weight: 600;
+        border: 2px solid #d9d9d9;
+        background: #ffffff;
+        color: #111111;
+        transition: all 200ms ease;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+      }
+      .choices-vertical button:hover {
+        background: #111111;
+        color: #ffffff;
+        border-color: #111111;
+        transform: translateY(-3px);
+        box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+      }
+      .choices-vertical button:active {
+        transform: translateY(1px);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        background: #333333;
+        border-color: #333333;
+      }
+      .choices-vertical button.choice-disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        background: #f5f5f5;
+        color: #999;
+      }
+      .choices-vertical button.choice-disabled:hover {
+        transform: none;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        background: #f5f5f5;
+        color: #999;
+        border-color: #d9d9d9;
+      }
+
+      /* Статус игрока */
+      .status-game {
+        text-align: center;
+        font-size: clamp(18px, 3vw, 28px);
+        font-weight: 600;
+        margin: 12px 0;
+      }
+
+      /* Низ: таймер с текстом внутри */
+      .game-footer {
+        flex-shrink: 0;
+        padding-top: 16px;
+        border-top: 2px solid #ececec;
+      }
+      .timer-track {
+        position: relative;
+        width: 100%;
+        height: 48px;
+        border-radius: 12px;
+        background: #efefef;
+        overflow: hidden;
+      }
+      .timer-bar {
+        position: absolute;
+        top: 0;
+        left: 0;
+        height: 100%;
+        transition: width 300ms linear, background 300ms linear;
+      }
+      .timer-text {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: clamp(16px, 2vw, 24px);
+        font-weight: 700;
+        color: #111;
+        z-index: 1;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
