@@ -17,9 +17,19 @@ const PHASE_LABELS: Record<Phase, string> = {
 export function renderHost(appEl: HTMLDivElement): void {
   appEl.innerHTML = `
     <div id="host-panel" class="panel host-panel">
-      <div id="section-lobby">
+      <div id="section-lobby" class="section-lobby">
         <p id="room-code" class="room-code"></p>
-        <button id="start">Старт матча</button>
+        <div class="lobby-players">
+          <div class="lobby-player" id="lobby-player-a">
+            <span class="lobby-dot"></span>
+            <span>Игрок 1: <strong id="lobby-a-name">Ожидание...</strong></span>
+          </div>
+          <div class="lobby-player" id="lobby-player-b">
+            <span class="lobby-dot"></span>
+            <span>Игрок 2: <strong id="lobby-b-name">Ожидание...</strong></span>
+          </div>
+        </div>
+        <button id="start" disabled>Старт матча</button>
       </div>
       <div id="section-game" class="section-game" style="display:none">
         <!-- Шапка: игроки -->
@@ -145,7 +155,7 @@ export function renderHost(appEl: HTMLDivElement): void {
 
     area.style.display = "";
     qText.textContent = room.currentQuestion.text;
-    qNumber.textContent = `ВОПРОС #${room.currentRoundIndex + 1}`;
+    qNumber.textContent = `${room.currentRoundIndex + 1}/${room.deckSize}`;
 
     for (let i = 0; i < 3; i++) {
       const card = document.querySelector<HTMLDivElement>(`#opt-${i + 1}`);
@@ -233,7 +243,6 @@ export function renderHost(appEl: HTMLDivElement): void {
 
   // --- Lobby: кнопка старта ---
   const startBtn = document.querySelector<HTMLButtonElement>("#start")!;
-  startBtn.style.display = "none";
 
   startBtn.onclick = () => socket.emit(CLIENT_TO_SERVER.hostStartMatch, { roomCode });
 
@@ -246,7 +255,6 @@ export function renderHost(appEl: HTMLDivElement): void {
     setRoomCode(payload.roomCode);
     setMyRole("host");
     setRoomCodeDisplay(payload.roomCode, true);
-    startBtn.style.display = "";
   });
 
   socket.off(SERVER_TO_CLIENT.matchFinished);
@@ -264,6 +272,22 @@ export function renderHost(appEl: HTMLDivElement): void {
     renderPlayers(room);
     renderQuestion(room);
     renderFinish(room, finishReason);
+
+    // Обновляем лобби
+    if (room.phase === "lobby") {
+      const lobbyA = document.querySelector<HTMLDivElement>("#lobby-a-name");
+      const lobbyB = document.querySelector<HTMLDivElement>("#lobby-b-name");
+      const lobbyPlayerA = document.querySelector<HTMLDivElement>("#lobby-player-a");
+      const lobbyPlayerB = document.querySelector<HTMLDivElement>("#lobby-player-b");
+
+      if (lobbyA) lobbyA.textContent = room.playerA?.nickname ?? "Ожидание...";
+      if (lobbyB) lobbyB.textContent = room.playerB?.nickname ?? "Ожидание...";
+      if (lobbyPlayerA) lobbyPlayerA.classList.toggle("connected", !!room.playerA);
+      if (lobbyPlayerB) lobbyPlayerB.classList.toggle("connected", !!room.playerB);
+
+      const bothConnected = room.playerA && room.playerB;
+      startBtn.disabled = !bothConnected;
+    }
   });
 
   setPhaseVisual("lobby");

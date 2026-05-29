@@ -30,6 +30,13 @@
         display: flex;
         flex-direction: column;
       }
+      .section-lobby {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+      }
       .panel.mobile-panel {
         width: 100vw;
         max-width: 100vw;
@@ -283,6 +290,41 @@
         letter-spacing: 8px;
         font-family: 'Courier New', monospace;
         margin: 24px 0;
+      }
+
+      /* Лобби — игроки */
+      .lobby-players {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        margin: 24px 0;
+      }
+      .lobby-player {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 18px;
+      }
+      .lobby-dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: #ccc;
+        transition: background 200ms ease;
+      }
+      .lobby-player.connected .lobby-dot {
+        background: #27ae60;
+      }
+      button:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+      button:disabled:hover {
+        background: #ffffff;
+        color: #111111;
+        border-color: #d9d9d9;
+        transform: none;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
       }
 
       /* Статус завершения */

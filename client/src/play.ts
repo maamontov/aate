@@ -27,6 +27,7 @@ export function renderMobile(appEl: HTMLDivElement, reconnect: boolean): void {
 
       <div id="section-game" class="section-game" style="display:none">
         <div class="game-center">
+          <div id="question-badge" class="question-number" style="display:none"></div>
           <p id="status-game" class="status-game"></p>
           <p id="finish-status" class="finish-status" style="display:none"></p>
           <div id="choices" class="choices-vertical"></div>
@@ -202,12 +203,28 @@ export function renderMobile(appEl: HTMLDivElement, reconnect: boolean): void {
   socket.off(SERVER_TO_CLIENT.roomUpdated);
   socket.on(SERVER_TO_CLIENT.roomUpdated, (room: RoomState) => {
     if (roomCode && room.roomCode !== roomCode) return;
-    const activeNick = room.activePlayer === "playerA" ? room.playerA?.nickname : room.playerB?.nickname;
-    setStatusGame(`Сейчас ходит ${activeNick ?? room.activePlayer}`);
+    
+    if (room.phase === "lobby") {
+      setStatusGame("Ждём начала игры");
+    } else {
+      const activeNick = room.activePlayer === "playerA" ? room.playerA?.nickname : room.playerB?.nickname;
+      setStatusGame(`Сейчас ходит ${activeNick ?? room.activePlayer}`);
+    }
     setPhaseVisual(room.phase);
     restartTimer(room.phaseDeadlineTs, room.phase);
     renderChoices(room);
     renderFinish(room, finishReason);
+
+    // Бейдж вопроса
+    const badge = document.querySelector<HTMLDivElement>("#question-badge");
+    if (badge) {
+      if (room.phase !== "lobby" && room.phase !== "finished") {
+        badge.style.display = "";
+        badge.textContent = `${room.currentRoundIndex + 1}/${room.deckSize}`;
+      } else {
+        badge.style.display = "none";
+      }
+    }
   });
 
   // --- Начальное состояние ---
