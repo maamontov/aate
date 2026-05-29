@@ -5,8 +5,8 @@ services:
       dockerfile: server/Dockerfile
     environment:
       - PORT=3001
-    ports:
-      - "3001:3001"
+    expose:
+      - "3001"
     restart: unless-stopped
 
   client:
@@ -16,5 +16,5 @@ services:
     depends_on:
       - server
     ports:
-      - "8080:80"
+      - "80:80"
     restart: unless-stopped
