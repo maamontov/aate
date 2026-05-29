@@ -17,7 +17,7 @@ const PHASE_LABELS: Record<Phase, string> = {
 export function renderMobile(appEl: HTMLDivElement, reconnect: boolean): void {
   const last = localStorage.getItem("lastNickname") ?? "";
   appEl.innerHTML = `
-    <div id="mobile-panel" class="panel">
+    <div id="mobile-panel" class="panel mobile-panel">
       <div id="section-connect">
         <input id="nickname" placeholder="Ник" value="${last}" />
         <input id="room" placeholder="Код комнаты" />
@@ -100,16 +100,16 @@ export function renderMobile(appEl: HTMLDivElement, reconnect: boolean): void {
     if (deadlineTs && phase !== "lobby" && phase !== "finished") timerId = window.setInterval(tick, 500);
   };
 
-  const renderChoices = (phase: RoomState["phase"], activePlayer: "playerA" | "playerB") => {
+  const renderChoices = (room: RoomState) => {
     const c = document.querySelector<HTMLDivElement>("#choices");
     if (!c || !roomCode || !myRole) return;
     c.innerHTML = "";
-    const iAmActive = myRole === activePlayer;
-    const canAnswer = phase === "answering" && iAmActive;
-    const canGuess = phase === "guessing" && !iAmActive;
+    const iAmActive = myRole === room.activePlayer;
+    const canAnswer = room.phase === "answering" && iAmActive;
+    const canGuess = room.phase === "guessing" && !iAmActive;
     if (!canAnswer && !canGuess) return;
 
-    const options = ["1", "2", "3"];
+    const options = room.currentQuestion?.options ?? ["1", "2", "3"];
     for (let i = 0; i < 3; i++) {
       const btn = document.createElement("button");
       btn.textContent = options[i];
@@ -190,7 +190,7 @@ export function renderMobile(appEl: HTMLDivElement, reconnect: boolean): void {
     setStatusGame(`Ход: ${activeNick ?? room.activePlayer}`);
     setPhaseVisual(room.phase);
     restartTimer(room.phaseDeadlineTs, room.phase);
-    renderChoices(room.phase, room.activePlayer);
+    renderChoices(room);
     renderFinish(room, finishReason);
   });
 

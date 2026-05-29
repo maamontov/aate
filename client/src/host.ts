@@ -29,26 +29,57 @@ export function renderHost(appEl: HTMLDivElement): void {
         <p id="room-code" class="room-code" style="display:none"></p>
       </div>
       <div id="section-game" style="display:none">
-        <div id="question-area" style="display:none">
-          <p id="question-text" class="question-text"></p>
-          <div id="options-row" class="options-row">
-            <div id="opt-1" class="option-card"></div>
-            <div id="opt-2" class="option-card"></div>
-            <div id="opt-3" class="option-card"></div>
+        <!-- Шапка: игроки -->
+        <div class="game-header">
+          <div id="player-a" class="player-card">
+            <div class="player-icon" style="background-color: #4CAF50;">🚀</div>
+            <div class="player-info">
+              <span id="player-a-name">ИГРОК 1</span>
+              <span id="player-a-score" class="player-score">0</span>
+            </div>
+          </div>
+          <div class="vs-label">VS</div>
+          <div id="player-b" class="player-card">
+            <div class="player-icon" style="background-color: #FFC107;">👾</div>
+            <div class="player-info">
+              <span id="player-b-name">ИГРОК 2</span>
+              <span id="player-b-score" class="player-score">0</span>
+            </div>
           </div>
         </div>
-        <p id="finish-status" class="finish-status" style="display:none"></p>
-        <p id="phase-timer" class="phase-timer"></p>
-        <div class="timer-track"><div id="timer-bar" class="timer-bar"></div></div>
-      </div>
-      <div id="players-bar" class="players-bar">
-        <div id="player-a" class="player-info">
-          <span id="player-a-name">ожидаем</span>
-          <span id="player-a-score" class="player-score"></span>
+
+        <!-- Центр: вопрос + ответы -->
+        <div class="game-center">
+          <div id="question-area" style="display:none">
+            <div class="question-container">
+              <div id="question-number" class="question-number">ВОПРОС #1</div>
+              <p id="question-text" class="question-text"></p>
+            </div>
+          </div>
+
+          <div id="options-row" class="options-column">
+            <div id="opt-1" class="option-card">
+              <div class="option-icon">⭐</div>
+              <span class="option-text"></span>
+            </div>
+            <div id="opt-2" class="option-card">
+              <div class="option-icon">🌳</div>
+              <span class="option-text"></span>
+            </div>
+            <div id="opt-3" class="option-card">
+              <div class="option-icon">💡</div>
+              <span class="option-text"></span>
+            </div>
+          </div>
+
+          <p id="finish-status" class="finish-status" style="display:none"></p>
         </div>
-        <div id="player-b" class="player-info">
-          <span id="player-b-score" class="player-score"></span>
-          <span id="player-b-name">ожидаем</span>
+
+        <!-- Низ: фаза + таймер -->
+        <div class="game-footer">
+          <p id="phase-label" class="phase-label"></p>
+          <div class="timer-track"><div id="timer-bar" class="timer-bar"></div></div>
+          <p id="phase-timer" class="phase-timer"></p>
         </div>
       </div>
     </div>
@@ -73,9 +104,11 @@ export function renderHost(appEl: HTMLDivElement): void {
     el.textContent = code;
     el.style.display = visible ? "" : "none";
   };
-  const setPhaseTimer = (text: string) => {
-    const el = document.querySelector<HTMLParagraphElement>("#phase-timer");
-    if (el) el.textContent = text;
+  const setPhaseTimer = (label: string, seconds: string) => {
+    const labelEl = document.querySelector<HTMLParagraphElement>("#phase-label");
+    const timerEl = document.querySelector<HTMLParagraphElement>("#phase-timer");
+    if (labelEl) labelEl.textContent = label;
+    if (timerEl) timerEl.textContent = seconds;
   };
   const setTimerBar = (percent: number, color: string) => {
     const bar = document.querySelector<HTMLDivElement>("#timer-bar");
@@ -104,16 +137,17 @@ export function renderHost(appEl: HTMLDivElement): void {
     const aScore = document.querySelector<HTMLSpanElement>("#player-a-score");
     const bName = document.querySelector<HTMLSpanElement>("#player-b-name");
     const bScore = document.querySelector<HTMLSpanElement>("#player-b-score");
-    if (aName) aName.textContent = room.playerA?.nickname ?? "ожидаем";
-    if (aScore) aScore.textContent = room.playerA ? String(room.playerA.score) : "";
-    if (bName) bName.textContent = room.playerB?.nickname ?? "ожидаем";
-    if (bScore) bScore.textContent = room.playerB ? String(room.playerB.score) : "";
+    if (aName) aName.textContent = room.playerA?.nickname ?? "ИГРОК 1";
+    if (aScore) aScore.textContent = room.playerA ? String(room.playerA.score) : "150";
+    if (bName) bName.textContent = room.playerB?.nickname ?? "ИГРОК 2";
+    if (bScore) bScore.textContent = room.playerB ? String(room.playerB.score) : "230";
   };
 
   const renderQuestion = (room: RoomState) => {
     const area = document.querySelector<HTMLDivElement>("#question-area");
     const qText = document.querySelector<HTMLParagraphElement>("#question-text");
-    if (!area || !qText) return;
+    const qNumber = document.querySelector<HTMLDivElement>(".question-number");
+    if (!area || !qText || !qNumber) return;
 
     if (!room.currentQuestion || room.phase === "lobby" || room.phase === "finished") {
       area.style.display = "none";
@@ -122,11 +156,17 @@ export function renderHost(appEl: HTMLDivElement): void {
 
     area.style.display = "";
     qText.textContent = room.currentQuestion.text;
+    qNumber.textContent = `ВОПРОС #${room.currentRoundIndex + 1}`;
 
     for (let i = 0; i < 3; i++) {
       const card = document.querySelector<HTMLDivElement>(`#opt-${i + 1}`);
       if (!card) continue;
-      card.textContent = room.currentQuestion.options[i];
+      const option = room.currentQuestion.options[i];
+      const icon = card.querySelector<HTMLDivElement>(".option-icon");
+      const text = card.querySelector<HTMLSpanElement>(".option-text");
+      
+      if (icon) icon.textContent = ["⭐", "🌳", "💡"][i];
+      if (text) text.textContent = option;
       card.className = "option-card";
 
       if (room.phase === "reveal") {
@@ -176,7 +216,7 @@ export function renderHost(appEl: HTMLDivElement): void {
     const tick = () => {
       const label = PHASE_LABELS[currentPhase] ?? currentPhase;
       const seconds = formatSecondsLeft(lastDeadline);
-      setPhaseTimer(`${label} · ${seconds}с`);
+      setPhaseTimer(label, `${seconds}с`);
       setTimerBar(progressPercent(currentPhase, lastDeadline), phaseColor(currentPhase));
     };
     tick();
