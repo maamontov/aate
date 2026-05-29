@@ -30,5 +30,7 @@ export interface RoomState {
   phaseDeadlineTs: number | null;
   paused: boolean;
   pauseDeadlineTs: number | null;
+  pausedBy: "playerA" | "playerB" | null;
+  pauseRemainingMs: number | null;
   winner: "playerA" | "playerB" | "draw" | null;
 }

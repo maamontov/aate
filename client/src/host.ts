@@ -82,6 +82,11 @@ export function renderHost(appEl: HTMLDivElement): void {
             <span id="timer-text" class="timer-text"></span>
           </div>
         </div>
+        <!-- Оверлей паузы -->
+        <div id="pause-overlay" class="pause-overlay" style="display:none">
+          <div class="pause-text">⏸ ПАУЗА</div>
+          <div id="pause-info" class="pause-info"></div>
+        </div>
       </div>
     </div>
   `;
@@ -287,6 +292,23 @@ export function renderHost(appEl: HTMLDivElement): void {
 
       const bothConnected = room.playerA && room.playerB;
       startBtn.disabled = !bothConnected;
+    }
+
+    // Пауза
+    const pauseOverlay = document.querySelector<HTMLDivElement>("#pause-overlay");
+    const pauseInfo = document.querySelector<HTMLDivElement>("#pause-info");
+    if (pauseOverlay && pauseInfo) {
+      if (room.paused) {
+        pauseOverlay.style.display = "flex";
+        const pauserName = room.pausedBy === "playerA"
+          ? room.playerA?.nickname
+          : room.pausedBy === "playerB"
+            ? room.playerB?.nickname
+            : null;
+        pauseInfo.textContent = pauserName ? `${pauserName} поставил паузу` : "Пауза";
+      } else {
+        pauseOverlay.style.display = "none";
+      }
     }
   });
 

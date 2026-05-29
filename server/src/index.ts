@@ -19,12 +19,9 @@ const io = new Server(httpServer, { cors: { origin: "*" } });
 
 const rooms = new Map<string, RoomState>();
 const timers = new Map<string, NodeJS.Timeout>();
-const pauseTimers = new Map<string, NodeJS.Timeout>();
-const disconnectedSockets = new Map<string, Set<string>>();
 const ANSWER_MS = 20_000;
 const GUESS_MS = 20_000;
 const REVEAL_MS = 5_000;
-const PAUSE_ON_DISCONNECT_MS = 30_000;
 
 function randomRoomCode(): string {
   return Math.random().toString(36).slice(2, 6).toUpperCase();
@@ -52,6 +49,7 @@ function emitRoom(roomCode: string): void {
     phaseDeadlineTs: room.phaseDeadlineTs,
     paused: room.paused,
     pauseDeadlineTs: room.pauseDeadlineTs,
+    pausedBy: room.pausedBy,
     winner: room.winner,
     currentQuestion: q ? { text: q.text, options: q.options } : null,
     activeAnswer: room.activeAnswer,
@@ -68,19 +66,15 @@ function clearRoomTimer(roomCode: string): void {
   }
 }
 
-function clearPauseTimer(roomCode: string): void {
-  const timer = pauseTimers.get(roomCode);
-  if (timer) {
-    clearTimeout(timer);
-    pauseTimers.delete(roomCode);
-  }
-}
-
 function setPaused(roomCode: string, paused: boolean): void {
   const room = rooms.get(roomCode);
   if (!room) return;
   room.paused = paused;
-  room.pauseDeadlineTs = paused ? Date.now() + PAUSE_ON_DISCONNECT_MS : null;
+  room.pauseDeadlineTs = null;
+  if (!paused) {
+    room.pausedBy = null;
+    room.pauseRemainingMs = null;
+  }
   io.to(roomCode).emit(SERVER_TO_CLIENT.roomPauseState, { paused: room.paused, pauseDeadlineTs: room.pauseDeadlineTs });
   emitRoom(roomCode);
 }
@@ -180,6 +174,112 @@ function revealRound(roomCode: string): void {
   );
 }
 
+function resumePhase(roomCode: string): void {
+  const room = rooms.get(roomCode);
+  if (!room || room.paused) return;
+
+  const remaining = room.pauseRemainingMs ?? 0;
+  room.phaseDeadlineTs = Date.now() + remaining;
+  room.pauseRemainingMs = null;
+
+  if (remaining <= 0) {
+    // Время фазы истекло — сразу переходим к следующей
+    advancePhase(roomCode);
+    return;
+  }
+
+  switch (room.phase) {
+    case "question":
+      timers.set(roomCode, setTimeout(() => advancePhase(roomCode), remaining));
+      break;
+    case "answering":
+      timers.set(roomCode, setTimeout(() => {
+        const r = rooms.get(roomCode);
+        if (!r || r.phase !== "answering" || r.paused) return;
+        nextPhase(roomCode, "guessing", GUESS_MS);
+        timers.set(roomCode, setTimeout(() => {
+          const rr = rooms.get(roomCode);
+          if (!rr || rr.phase !== "guessing" || rr.paused) return;
+          revealRound(roomCode);
+        }, GUESS_MS));
+      }, remaining));
+      break;
+    case "guessing":
+      timers.set(roomCode, setTimeout(() => {
+        const r = rooms.get(roomCode);
+        if (!r || r.phase !== "guessing" || r.paused) return;
+        revealRound(roomCode);
+      }, remaining));
+      break;
+    case "reveal":
+      timers.set(roomCode, setTimeout(() => {
+        const r = rooms.get(roomCode);
+        if (!r || r.paused) return;
+        r.currentRoundIndex += 1;
+        if (r.currentRoundIndex >= r.deckSize) {
+          r.phase = "finished";
+          r.phaseDeadlineTs = null;
+          scoreWinner(r);
+          io.to(roomCode).emit(SERVER_TO_CLIENT.matchFinished, { winner: r.winner });
+          emitRoom(roomCode);
+          return;
+        }
+        r.activePlayer = r.activePlayer === "playerA" ? "playerB" : "playerA";
+        startRound(roomCode);
+      }, remaining));
+      break;
+  }
+
+  emitRoom(roomCode);
+}
+
+function advancePhase(roomCode: string): void {
+  const room = rooms.get(roomCode);
+  if (!room || room.paused) return;
+
+  switch (room.phase) {
+    case "question":
+      nextPhase(roomCode, "answering", ANSWER_MS);
+      timers.set(roomCode, setTimeout(() => {
+        const r = rooms.get(roomCode);
+        if (!r || r.phase !== "answering" || r.paused) return;
+        nextPhase(roomCode, "guessing", GUESS_MS);
+        timers.set(roomCode, setTimeout(() => {
+          const rr = rooms.get(roomCode);
+          if (!rr || rr.phase !== "guessing" || rr.paused) return;
+          revealRound(roomCode);
+        }, GUESS_MS));
+      }, ANSWER_MS));
+      break;
+    case "answering":
+      nextPhase(roomCode, "guessing", GUESS_MS);
+      timers.set(roomCode, setTimeout(() => {
+        const r = rooms.get(roomCode);
+        if (!r || r.phase !== "guessing" || r.paused) return;
+        revealRound(roomCode);
+      }, GUESS_MS));
+      break;
+    case "guessing":
+      revealRound(roomCode);
+      break;
+    case "reveal":
+      const r = rooms.get(roomCode);
+      if (!r) return;
+      r.currentRoundIndex += 1;
+      if (r.currentRoundIndex >= r.deckSize) {
+        r.phase = "finished";
+        r.phaseDeadlineTs = null;
+        scoreWinner(r);
+        io.to(roomCode).emit(SERVER_TO_CLIENT.matchFinished, { winner: r.winner });
+        emitRoom(roomCode);
+        return;
+      }
+      r.activePlayer = r.activePlayer === "playerA" ? "playerB" : "playerA";
+      startRound(roomCode);
+      break;
+  }
+}
+
 io.on("connection", (socket: Socket) => {
   socket.on(CLIENT_TO_SERVER.hostCreateRoom, ({ deckSize }: { deckSize: DeckSize }) => {
     const roomCode = randomRoomCode();
@@ -198,6 +298,8 @@ io.on("connection", (socket: Socket) => {
       phaseDeadlineTs: null,
       paused: false,
       pauseDeadlineTs: null,
+      pausedBy: null,
+      pauseRemainingMs: null,
       winner: null
     };
     rooms.set(roomCode, room);
@@ -209,7 +311,6 @@ io.on("connection", (socket: Socket) => {
   socket.on(CLIENT_TO_SERVER.playerJoinRoom, ({ roomCode, nickname }: { roomCode: string; nickname: string }) => {
     const room = rooms.get(roomCode);
     if (!room) return socket.emit(SERVER_TO_CLIENT.errorDomain, { message: "Комната не найдена" });
-    clearPauseTimer(roomCode);
     setPaused(roomCode, false);
     if (!room.playerA) {
       room.playerA = { socketId: socket.id, nickname, score: 0 };
@@ -265,19 +366,41 @@ io.on("connection", (socket: Socket) => {
     revealRound(roomCode);
   });
 
+  socket.on(CLIENT_TO_SERVER.playerTogglePause, ({ roomCode }: { roomCode: string }) => {
+    const room = rooms.get(roomCode);
+    if (!room) return;
+    if (room.phase === "lobby" || room.phase === "finished") return;
+
+    const role: "playerA" | "playerB" | null =
+      socket.id === room.playerA?.socketId ? "playerA" :
+      socket.id === room.playerB?.socketId ? "playerB" : null;
+    if (!role) return;
+
+    if (!room.paused) {
+      // Ставим на паузу
+      room.paused = true;
+      room.pausedBy = role;
+      room.pauseRemainingMs = Math.max(0, (room.phaseDeadlineTs ?? 0) - Date.now());
+      clearRoomTimer(roomCode);
+    } else if (room.pausedBy === role) {
+      // Снимаем паузу (только тот, кто поставил)
+      room.paused = false;
+      room.pausedBy = null;
+      resumePhase(roomCode);
+    } else {
+      return; // другой игрок не может снять паузу
+    }
+
+    io.to(roomCode).emit(SERVER_TO_CLIENT.roomPauseState, { paused: room.paused, pauseDeadlineTs: room.pauseDeadlineTs });
+    emitRoom(roomCode);
+  });
+
   socket.on(
     CLIENT_TO_SERVER.clientReconnectRoom,
     ({ roomCode, roleHint, nickname }: { roomCode: string; roleHint?: "host" | "playerA" | "playerB"; nickname?: string }) => {
       const room = rooms.get(roomCode);
       if (!room) return socket.emit(SERVER_TO_CLIENT.errorDomain, { message: "Комната не найдена" });
-      clearPauseTimer(roomCode);
       setPaused(roomCode, false);
-      let disconnectedSet = disconnectedSockets.get(roomCode);
-      if (!disconnectedSet) {
-        disconnectedSet = new Set<string>();
-        disconnectedSockets.set(roomCode, disconnectedSet);
-      }
-      disconnectedSet.delete(socket.id);
       if (roleHint === "host") room.hostSocketId = socket.id;
       if (roleHint === "playerA" && room.playerA) room.playerA.socketId = socket.id;
       if (roleHint === "playerB" && room.playerB) room.playerB.socketId = socket.id;
@@ -300,36 +423,19 @@ io.on("connection", (socket: Socket) => {
       if ((isA || isB) && isActive) {
         // Игрок отключился во время игры — сразу завершаем
         clearRoomTimer(roomCode);
-        clearPauseTimer(roomCode);
         room.phase = "finished";
         room.phaseDeadlineTs = null;
         scoreWinner(room);
         io.to(roomCode).emit(SERVER_TO_CLIENT.matchFinished, { winner: room.winner, reason: "player_disconnect" });
         emitRoom(roomCode);
-      } else if (isHost) {
-        // Host отключился — пауза 30с
-        let disconnectedSet = disconnectedSockets.get(roomCode);
-        if (!disconnectedSet) {
-          disconnectedSet = new Set<string>();
-          disconnectedSockets.set(roomCode, disconnectedSet);
-        }
-        disconnectedSet.add(socket.id);
+      } else if (isHost && isActive) {
+        // Host отключился — сразу завершаем матч
         clearRoomTimer(roomCode);
-        clearPauseTimer(roomCode);
-        setPaused(roomCode, true);
-        io.to(roomCode).emit(SERVER_TO_CLIENT.roomPeerDisconnected, { roomCode });
-        pauseTimers.set(
-          roomCode,
-          setTimeout(() => {
-            const r = rooms.get(roomCode);
-            if (!r) return;
-            r.phase = "finished";
-            r.phaseDeadlineTs = null;
-            scoreWinner(r);
-            io.to(roomCode).emit(SERVER_TO_CLIENT.matchFinished, { winner: r.winner, reason: "disconnect_timeout" });
-            emitRoom(roomCode);
-          }, PAUSE_ON_DISCONNECT_MS)
-        );
+        room.phase = "finished";
+        room.phaseDeadlineTs = null;
+        scoreWinner(room);
+        io.to(roomCode).emit(SERVER_TO_CLIENT.matchFinished, { winner: room.winner, reason: "host_disconnect" });
+        emitRoom(roomCode);
       }
       break;
     }

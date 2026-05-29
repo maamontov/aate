@@ -29,6 +29,7 @@
         flex: 1;
         display: flex;
         flex-direction: column;
+        position: relative;
       }
       .section-lobby {
         flex: 1;
@@ -87,6 +88,63 @@
         box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         background: #333333;
         border-color: #333333;
+      }
+
+      /* Пауза */
+      .pause-btn {
+        margin-top: 24px;
+        padding: 12px 36px;
+        font-size: 16px;
+        font-weight: 600;
+        border-radius: 10px;
+        border: 2px solid #666;
+        background: #666;
+        color: #fff;
+        cursor: pointer;
+        width: auto;
+        align-self: center;
+      }
+      .pause-btn:hover {
+        background: #444;
+        border-color: #444;
+      }
+      .pause-overlay {
+        position: absolute;
+        inset: 0;
+        background: rgba(255, 255, 255, 0.93);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 100;
+        border-radius: 14px;
+      }
+      .pause-text {
+        font-size: clamp(48px, 10vw, 96px);
+        font-weight: 800;
+        color: #111;
+        letter-spacing: 4px;
+      }
+      .pause-info {
+        font-size: 20px;
+        color: #666;
+        margin-top: 12px;
+      }
+      .pause-resume-btn {
+        margin-top: 24px;
+        padding: 14px 48px;
+        font-size: 18px;
+        font-weight: 600;
+        border-radius: 12px;
+        border: 2px solid #111;
+        background: #111;
+        color: #fff;
+        cursor: pointer;
+        width: auto;
+      }
+      .pause-resume-btn:hover {
+        background: #333;
+        border-color: #333;
       }
 
       .muted { color: #4f4f4f; font-size: 14px; transition: color 220ms ease; }

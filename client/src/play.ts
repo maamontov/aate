@@ -33,12 +33,18 @@ export function renderMobile(appEl: HTMLDivElement, reconnect: boolean): void {
           <p id="status-game" class="status-game"></p>
           <p id="finish-status" class="finish-status" style="display:none"></p>
           <div id="choices" class="choices-vertical"></div>
+          <button id="pause-btn" class="pause-btn" style="display:none">Пауза</button>
         </div>
         <div class="game-footer">
           <div class="timer-track">
             <div id="timer-bar" class="timer-bar"></div>
             <span id="timer-text" class="timer-text"></span>
           </div>
+        </div>
+        <div id="pause-overlay" class="pause-overlay" style="display:none">
+          <div class="pause-text">⏸ ПАУЗА</div>
+          <div id="pause-info" class="pause-info"></div>
+          <button id="pause-resume-btn" class="pause-resume-btn" style="display:none">Продолжить</button>
         </div>
       </div>
     </div>
@@ -182,6 +188,15 @@ export function renderMobile(appEl: HTMLDivElement, reconnect: boolean): void {
   };
   setupBaseEvents(setStatusDynamic);
 
+  // --- Пауза ---
+  const pauseBtn = document.querySelector<HTMLButtonElement>("#pause-btn")!;
+  const pauseResumeBtn = document.querySelector<HTMLButtonElement>("#pause-resume-btn")!;
+  const pauseOverlay = document.querySelector<HTMLDivElement>("#pause-overlay")!;
+  const pauseInfo = document.querySelector<HTMLDivElement>("#pause-info")!;
+
+  pauseBtn.onclick = () => socket.emit(CLIENT_TO_SERVER.playerTogglePause, { roomCode });
+  pauseResumeBtn.onclick = () => socket.emit(CLIENT_TO_SERVER.playerTogglePause, { roomCode });
+
   // --- Подключение ---
   (document.querySelector("#join") as HTMLButtonElement).onclick = () => {
     const nickname = (document.querySelector("#nickname") as HTMLInputElement).value.trim();
@@ -233,6 +248,24 @@ export function renderMobile(appEl: HTMLDivElement, reconnect: boolean): void {
       } else {
         badge.style.display = "none";
       }
+    }
+
+    // Пауза
+    const isGameActive = room.phase !== "lobby" && room.phase !== "finished";
+    pauseBtn.style.display = isGameActive && !room.paused ? "" : "none";
+
+    if (room.paused) {
+      pauseOverlay.style.display = "flex";
+      if (room.pausedBy === myRole) {
+        pauseResumeBtn.style.display = "";
+        pauseInfo.textContent = "Вы поставили паузу";
+      } else {
+        pauseResumeBtn.style.display = "none";
+        pauseInfo.textContent = "Другой игрок поставил паузу";
+      }
+    } else {
+      pauseOverlay.style.display = "none";
+      pauseResumeBtn.style.display = "none";
     }
   });
 

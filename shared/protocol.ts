@@ -18,6 +18,7 @@ export type PublicRoomState = {
   phaseDeadlineTs: number | null;
   paused: boolean;
   pauseDeadlineTs: number | null;
+  pausedBy: "playerA" | "playerB" | null;
   winner: "playerA" | "playerB" | "draw" | null;
   currentQuestion: { text: string; options: [string, string, string] } | null;
   activeAnswer: 1 | 2 | 3 | null;
@@ -30,6 +31,7 @@ export const CLIENT_TO_SERVER = {
   hostStartMatch: "host:start_match",
   playerSubmitActiveAnswer: "player:submit_active_answer",
   playerSubmitGuessAnswer: "player:submit_guess_answer",
+  playerTogglePause: "player:toggle_pause",
   clientReconnectRoom: "client:reconnect_room"
 } as const;
 
