@@ -232,7 +232,7 @@ export function renderHost(appEl: HTMLDivElement): void {
   let timerId: number | null = null;
   let finishReason: string | undefined;
 
-  const restartTimer = (deadlineTs: number | null, phase: RoomState["phase"]) => {
+  const restartTimer = (deadlineTs: number | null, phase: RoomState["phase"], paused = false) => {
     lastDeadline = deadlineTs;
     currentPhase = phase;
     if (timerId) window.clearInterval(timerId);
@@ -243,7 +243,7 @@ export function renderHost(appEl: HTMLDivElement): void {
       setTimerBar(progressPercent(currentPhase, lastDeadline), phaseColor(currentPhase));
     };
     tick();
-    if (deadlineTs && phase !== "lobby" && phase !== "finished") timerId = window.setInterval(tick, 500);
+    if (deadlineTs && phase !== "lobby" && phase !== "finished" && !paused) timerId = window.setInterval(tick, 500);
   };
 
   // --- Lobby: кнопка старта ---
@@ -273,7 +273,7 @@ export function renderHost(appEl: HTMLDivElement): void {
     showSection(room.phase);
     setRoomCodeDisplay(room.roomCode, room.phase === "lobby");
     setPhaseVisual(room.phase);
-    restartTimer(room.phaseDeadlineTs, room.phase);
+    restartTimer(room.phaseDeadlineTs, room.phase, room.paused);
     renderPlayers(room);
     renderQuestion(room);
     renderFinish(room, finishReason);
