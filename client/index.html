@@ -72,8 +72,6 @@
       }
 
       .muted { color: #4f4f4f; font-size: 14px; transition: color 220ms ease; }
-      .timer-track { width: 100%; height: 8px; border-radius: 999px; background: #efefef; overflow: hidden; margin-top: 6px; }
-      .timer-bar { width: 0%; height: 100%; background: #777; transition: width 300ms linear, background 300ms linear; }
       hr { border: none; border-top: 1px solid #ececec; margin: 12px 0; }
 
       /* Вопрос — крупный адаптивный текст */
@@ -130,47 +128,40 @@
 
       /* Блок игроков — верхняя панель */
       .game-header {
-        display: grid;
-        grid-template-columns: 1fr auto 1fr;
+        display: flex;
+        justify-content: space-between;
+        align-items: stretch;
         gap: 24px;
-        align-items: center;
         margin-bottom: 32px;
-        padding-bottom: 24px;
-        border-bottom: 2px solid #ececec;
       }
-      .player-card {
+      .player-block {
+        display: flex;
+        align-items: stretch;
+        flex: 1;
+        border: 2px solid #e6e6e6;
+        border-radius: 12px;
+        overflow: hidden;
+      }
+      .player-score {
+        background: #f5f5f5;
+        padding: 16px 24px;
+        font-size: clamp(28px, 4vw, 48px);
+        font-weight: 700;
         display: flex;
         align-items: center;
-        gap: 12px;
-      }
-      .player-icon {
-        width: 48px;
-        height: 48px;
-        display: flex;
-        align-items: center;
+        min-width: 80px;
         justify-content: center;
-        border-radius: 10px;
-        font-size: 24px;
-        flex-shrink: 0;
       }
-      .player-info {
+      .player-name {
+        padding: 16px 24px;
         font-size: clamp(18px, 2.5vw, 28px);
         font-weight: 600;
         display: flex;
-        align-items: baseline;
-        gap: 8px;
+        align-items: center;
+        flex: 1;
       }
-      .player-score {
-        font-size: clamp(24px, 3vw, 40px);
-        font-weight: 700;
-      }
-      .vs-label {
-        font-size: 20px;
-        font-weight: 700;
-        color: #999;
-        text-transform: uppercase;
-        letter-spacing: 2px;
-      }
+      .player-left { flex-direction: row; }
+      .player-right { flex-direction: row-reverse; }
 
       /* Центр: вопрос + ответы */
       .game-center {
@@ -203,37 +194,38 @@
         display: inline-block;
       }
 
-      /* Варианты ответов — вертикальные карточки (для хоста) */
-      .options-column {
+      /* Варианты ответов — сетка 2+1 */
+      .options-grid {
         display: flex;
         flex-direction: column;
         gap: 12px;
         margin: 16px 0;
       }
-      .option-card {
-        padding: 20px 14px;
-        border: 2px solid #e6e6e6;
-        border-radius: 12px;
-        text-align: center;
-        font-size: clamp(18px, 2.5vw, 28px);
-        font-weight: 500;
-        line-height: 1.3;
-        transition: border-color 200ms, background 200ms;
-        display: flex;
-        align-items: center;
+      .options-row-top {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
         gap: 12px;
       }
-      .option-icon {
-        width: 32px;
-        height: 32px;
+      .options-row-bottom {
         display: flex;
-        align-items: center;
         justify-content: center;
-        font-size: 20px;
       }
-      .option-text {
-        flex: 1;
-        text-align: left;
+      .options-row-bottom .option-card {
+        width: calc(50% - 6px);
+      }
+      .option-card {
+        padding: 24px 18px;
+        border: 2px solid #e6e6e6;
+        border-radius: 14px;
+        text-align: center;
+        font-size: clamp(20px, 3vw, 32px);
+        font-weight: 500;
+        line-height: 1.3;
+        transition: border-color 200ms, background 200ms, transform 150ms ease;
+      }
+      .option-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 6px 20px rgba(0,0,0,0.1);
       }
       .option-card.selected-active { border-color: #f2c94c; background: #fef9e7; }
       .option-card.selected-guess { border-color: #eb5757; background: #fde8e8; }
@@ -258,27 +250,6 @@
         line-height: 1.4;
       }
 
-      /* Блок игроков внизу карточки */
-      .players-bar {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 16px 0 0;
-        margin-top: auto;
-        border-top: 1px solid #ececec;
-      }
-      .player-info {
-        font-size: clamp(18px, 2.5vw, 28px);
-        font-weight: 600;
-        display: flex;
-        align-items: baseline;
-        gap: 8px;
-      }
-      .player-score {
-        font-size: clamp(24px, 3vw, 40px);
-        font-weight: 700;
-      }
-
       /* Варианты ответов — вертикальные (для игрока) */
       .choices-vertical {
         display: flex;
@@ -312,68 +283,36 @@
         border-color: #333333;
       }
 
-      /* Статус завершения */
-      .finish-status {
-        text-align: center;
-        font-size: clamp(18px, 2.5vw, 28px);
-        font-weight: 500;
-        margin: 16px 0;
-        line-height: 1.4;
-      }
-
-      /* Низ: фаза + таймер */
+      /* Низ: таймер с текстом внутри */
       .game-footer {
         margin-top: auto;
         padding-top: 24px;
-        border-top: 2px solid #ececec;
-        text-align: center;
       }
-      .phase-label {
+      .timer-track {
+        position: relative;
+        width: 100%;
+        height: 48px;
+        border-radius: 12px;
+        background: #efefef;
+        overflow: hidden;
+      }
+      .timer-bar {
+        position: absolute;
+        top: 0;
+        left: 0;
+        height: 100%;
+        transition: width 300ms linear, background 300ms linear;
+      }
+      .timer-text {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
         font-size: clamp(16px, 2vw, 24px);
-        font-weight: 600;
-        color: #4f4f4f;
-        margin: 0 0 8px;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-      }
-      .phase-timer {
-        font-size: clamp(20px, 3vw, 36px);
         font-weight: 700;
         color: #111;
-        margin: 8px 0 0;
-      }
-
-      /* Варианты ответов — вертикальные (для игрока) */
-      .choices-vertical {
-        display: flex;
-        flex-direction: column;
-        gap: 16px;
-        margin: 20px 0;
-      }
-      .choices-vertical button {
-        padding: 24px;
-        font-size: 22px;
-        border-radius: 14px;
-        text-align: left;
-        font-weight: 600;
-        border: 2px solid #d9d9d9;
-        background: #ffffff;
-        color: #111111;
-        transition: all 200ms ease;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-      }
-      .choices-vertical button:hover {
-        background: #111111;
-        color: #ffffff;
-        border-color: #111111;
-        transform: translateY(-3px);
-        box-shadow: 0 8px 20px rgba(0,0,0,0.15);
-      }
-      .choices-vertical button:active {
-        transform: translateY(1px);
-        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        background: #333333;
-        border-color: #333333;
+        z-index: 1;
       }
     </style>
   </head>

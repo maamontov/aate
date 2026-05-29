@@ -31,20 +31,13 @@ export function renderHost(appEl: HTMLDivElement): void {
       <div id="section-game" style="display:none">
         <!-- Шапка: игроки -->
         <div class="game-header">
-          <div id="player-a" class="player-card">
-            <div class="player-icon" style="background-color: #4CAF50;">🚀</div>
-            <div class="player-info">
-              <span id="player-a-name">ИГРОК 1</span>
-              <span id="player-a-score" class="player-score">0</span>
-            </div>
+          <div class="player-block player-left">
+            <div class="player-score" id="player-a-score">0</div>
+            <div class="player-name" id="player-a-name">ИГРОК 1</div>
           </div>
-          <div class="vs-label">VS</div>
-          <div id="player-b" class="player-card">
-            <div class="player-icon" style="background-color: #FFC107;">👾</div>
-            <div class="player-info">
-              <span id="player-b-name">ИГРОК 2</span>
-              <span id="player-b-score" class="player-score">0</span>
-            </div>
+          <div class="player-block player-right">
+            <div class="player-name" id="player-b-name">ИГРОК 2</div>
+            <div class="player-score" id="player-b-score">0</div>
           </div>
         </div>
 
@@ -57,29 +50,31 @@ export function renderHost(appEl: HTMLDivElement): void {
             </div>
           </div>
 
-          <div id="options-row" class="options-column">
-            <div id="opt-1" class="option-card">
-              <div class="option-icon">⭐</div>
-              <span class="option-text"></span>
+          <div id="options-area" class="options-grid">
+            <div class="options-row-top">
+              <div id="opt-1" class="option-card">
+                <span class="option-text"></span>
+              </div>
+              <div id="opt-2" class="option-card">
+                <span class="option-text"></span>
+              </div>
             </div>
-            <div id="opt-2" class="option-card">
-              <div class="option-icon">🌳</div>
-              <span class="option-text"></span>
-            </div>
-            <div id="opt-3" class="option-card">
-              <div class="option-icon">💡</div>
-              <span class="option-text"></span>
+            <div class="options-row-bottom">
+              <div id="opt-3" class="option-card">
+                <span class="option-text"></span>
+              </div>
             </div>
           </div>
 
           <p id="finish-status" class="finish-status" style="display:none"></p>
         </div>
 
-        <!-- Низ: фаза + таймер -->
+        <!-- Низ: таймер с текстом внутри -->
         <div class="game-footer">
-          <p id="phase-label" class="phase-label"></p>
-          <div class="timer-track"><div id="timer-bar" class="timer-bar"></div></div>
-          <p id="phase-timer" class="phase-timer"></p>
+          <div class="timer-track">
+            <div id="timer-bar" class="timer-bar"></div>
+            <span id="timer-text" class="timer-text"></span>
+          </div>
         </div>
       </div>
     </div>
@@ -105,10 +100,8 @@ export function renderHost(appEl: HTMLDivElement): void {
     el.style.display = visible ? "" : "none";
   };
   const setPhaseTimer = (label: string, seconds: string) => {
-    const labelEl = document.querySelector<HTMLParagraphElement>("#phase-label");
-    const timerEl = document.querySelector<HTMLParagraphElement>("#phase-timer");
-    if (labelEl) labelEl.textContent = label;
-    if (timerEl) timerEl.textContent = seconds;
+    const el = document.querySelector<HTMLSpanElement>("#timer-text");
+    if (el) el.textContent = `${label} · ${seconds}`;
   };
   const setTimerBar = (percent: number, color: string) => {
     const bar = document.querySelector<HTMLDivElement>("#timer-bar");
@@ -162,10 +155,8 @@ export function renderHost(appEl: HTMLDivElement): void {
       const card = document.querySelector<HTMLDivElement>(`#opt-${i + 1}`);
       if (!card) continue;
       const option = room.currentQuestion.options[i];
-      const icon = card.querySelector<HTMLDivElement>(".option-icon");
       const text = card.querySelector<HTMLSpanElement>(".option-text");
       
-      if (icon) icon.textContent = ["⭐", "🌳", "💡"][i];
       if (text) text.textContent = option;
       card.className = "option-card";
 
@@ -216,7 +207,7 @@ export function renderHost(appEl: HTMLDivElement): void {
     const tick = () => {
       const label = PHASE_LABELS[currentPhase] ?? currentPhase;
       const seconds = formatSecondsLeft(lastDeadline);
-      setPhaseTimer(label, `${seconds}с`);
+      setPhaseTimer(label, seconds);
       setTimerBar(progressPercent(currentPhase, lastDeadline), phaseColor(currentPhase));
     };
     tick();
