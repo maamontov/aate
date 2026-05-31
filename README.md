@@ -81,7 +81,7 @@
 
 | Компонент | Технология |
 |-----------|------------|
-| Frontend | TypeScript, Vite, PixiJS |
+| Frontend | TypeScript, Vite |
 | Backend | Node.js, Express, Socket.IO |
 | Протокол | WebSocket (Socket.IO) |
 | Деплой | Docker Compose, Nginx |

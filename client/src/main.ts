@@ -1,6 +1,5 @@
 import { renderHost } from "./host";
 import { renderMobile } from "./play";
-import { bootPixiHint } from "./pixiHint";
 import { socket } from "./socket";
 import { myRole, roomCode } from "./state";
 import { CLIENT_TO_SERVER } from "./events";
@@ -19,5 +18,3 @@ if (path === "/" || path.startsWith("/host")) {
 } else if (path.startsWith("/play")) {
   renderMobile(appEl, !!roomCode);
 }
-
-void bootPixiHint();
